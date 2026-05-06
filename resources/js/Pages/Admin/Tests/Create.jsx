@@ -1,0 +1,396 @@
+import { Head, Link, router } from "@inertiajs/react";
+import { useState } from "react";
+import AppLayout from "../../../Layouts/AppLayout";
+
+let _id = 0;
+const uid = () => ++_id;
+
+function mkAnswer(text = "", is_correct = false) {
+    return { _id: uid(), text, is_correct };
+}
+
+function mkQuestion() {
+    return { _id: uid(), text: "", type: "single", answers: [mkAnswer(), mkAnswer()] };
+}
+
+function initFromTest(test) {
+    return (test?.questions ?? []).map((q) => ({
+        _id: uid(),
+        text: q.text,
+        type: q.type,
+        answers: (q.answers ?? []).map((a) => ({
+            _id: uid(),
+            text: a.text,
+            is_correct: a.is_correct,
+        })),
+    }));
+}
+
+// ── Карточка вопроса ────────────────────────────────────────────────
+function QuestionCard({ q, index, onChange, onRemove, hasError }) {
+    function setAnswerCorrect(aId) {
+        const updated = q.answers.map((a) =>
+            q.type === "multiple"
+                ? a._id === aId ? { ...a, is_correct: !a.is_correct } : a
+                : { ...a, is_correct: a._id === aId }
+        );
+        onChange({ ...q, answers: updated });
+    }
+
+    function updateAnswerText(aId, text) {
+        onChange({ ...q, answers: q.answers.map((a) => a._id === aId ? { ...a, text } : a) });
+    }
+
+    function addAnswer() {
+        onChange({ ...q, answers: [...q.answers, mkAnswer()] });
+    }
+
+    function removeAnswer(aId) {
+        onChange({ ...q, answers: q.answers.filter((a) => a._id !== aId) });
+    }
+
+    function setType(type) {
+        const answers = type === "single"
+            ? q.answers.map((a, i) => ({ ...a, is_correct: i === 0 ? q.answers.some(a => a.is_correct) && a.is_correct : false }))
+            : q.answers;
+        onChange({ ...q, type, answers });
+    }
+
+    const hasCorrect = q.answers.some((a) => a.is_correct);
+
+    return (
+        <div className={`bg-white rounded-xl border overflow-hidden ${hasError && !hasCorrect ? "border-red-300" : "border-gray-200"}`}>
+            {/* Шапка вопроса */}
+            <div className="flex items-center gap-3 px-5 pt-4 pb-3 border-b border-gray-100">
+                <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold shrink-0">
+                    {index + 1}
+                </span>
+                <textarea
+                    value={q.text}
+                    onChange={(e) => onChange({ ...q, text: e.target.value })}
+                    placeholder="Введите текст вопроса..."
+                    rows={2}
+                    className="flex-1 text-sm text-gray-900 bg-transparent resize-none outline-none placeholder-gray-300 font-medium"
+                />
+                <button
+                    onClick={onRemove}
+                    title="Удалить вопрос"
+                    className="shrink-0 p-1.5 text-gray-300 hover:text-red-400 rounded-lg hover:bg-red-50 transition-colors"
+                >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round"
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0a2 2 0 00-2-2H9a2 2 0 00-2 2m10 0H5" />
+                    </svg>
+                </button>
+            </div>
+
+            {/* Тип + ошибка */}
+            <div className="px-5 py-2 flex items-center gap-4 border-b border-gray-100 bg-gray-50/60">
+                {["single", "multiple"].map((t) => (
+                    <label key={t} className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-500">
+                        <input
+                            type="radio"
+                            name={`type_${q._id}`}
+                            checked={q.type === t}
+                            onChange={() => setType(t)}
+                            className="accent-blue-600"
+                        />
+                        {t === "single" ? "Один ответ" : "Несколько ответов"}
+                    </label>
+                ))}
+                {hasError && !hasCorrect && (
+                    <span className="ml-auto text-xs text-red-600 font-medium">
+                        ⚠ Укажите правильный ответ
+                    </span>
+                )}
+            </div>
+
+            {/* Варианты ответа */}
+            <div className="px-5 py-3 space-y-2">
+                {q.answers.map((a) => (
+                    <div key={a._id} className="flex items-center gap-3 group">
+                        <button
+                            type="button"
+                            onClick={() => setAnswerCorrect(a._id)}
+                            title={a.is_correct ? "Верный ответ" : "Отметить как верный"}
+                            className={`shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                                a.is_correct
+                                    ? "bg-green-500 border-green-500 text-white"
+                                    : "border-gray-300 hover:border-green-400"
+                            }`}
+                        >
+                            {a.is_correct && (
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                            )}
+                        </button>
+
+                        <input
+                            type="text"
+                            value={a.text}
+                            onChange={(e) => updateAnswerText(a._id, e.target.value)}
+                            placeholder="Вариант ответа..."
+                            className={`flex-1 text-sm px-3 py-1.5 rounded-lg border outline-none transition-colors ${
+                                a.is_correct
+                                    ? "border-green-300 bg-green-50 text-green-800"
+                                    : "border-gray-200 focus:border-blue-400 bg-white"
+                            }`}
+                        />
+
+                        <button
+                            type="button"
+                            onClick={() => removeAnswer(a._id)}
+                            className="shrink-0 text-gray-200 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                ))}
+
+                <button
+                    type="button"
+                    onClick={addAnswer}
+                    className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700 pt-1"
+                >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Добавить вариант
+                </button>
+            </div>
+        </div>
+    );
+}
+
+// ── Главная форма ───────────────────────────────────────────────────
+export default function TestCreate({ documents, document_id, test }) {
+    const isEdit = !!test;
+
+    const [title, setTitle]               = useState(test?.title ?? "");
+    const [docId, setDocId]               = useState(test?.document_id ? String(test.document_id) : (document_id ?? ""));
+    const [passingScore, setPassingScore] = useState(test?.passing_score ?? 70);
+    const [timeLimit, setTimeLimit]       = useState(test?.time_limit ?? "");
+    const [maxAttempts, setMaxAttempts]   = useState(test?.max_attempts ?? 3);
+    const [isActive, setIsActive]         = useState(test?.is_active ?? true);
+    const [questions, setQuestions]       = useState(isEdit ? initFromTest(test) : [mkQuestion()]);
+    const [submitting, setSubmitting]     = useState(false);
+    const [errors, setErrors]             = useState({});
+    const [validated, setValidated]       = useState(false);
+
+    function updateQuestion(id, updated) {
+        setQuestions((qs) => qs.map((q) => q._id === id ? updated : q));
+    }
+
+    function removeQuestion(id) {
+        setQuestions((qs) => qs.filter((q) => q._id !== id));
+    }
+
+    function addQuestion() {
+        setQuestions((qs) => [...qs, mkQuestion()]);
+    }
+
+    function validate() {
+        for (let i = 0; i < questions.length; i++) {
+            const q = questions[i];
+            if (!q.text.trim()) return `Вопрос ${i + 1}: введите текст вопроса.`;
+            if (!q.answers.some((a) => a.is_correct)) return `Вопрос ${i + 1}: укажите правильный вариант ответа.`;
+            const filledAnswers = q.answers.filter((a) => a.text.trim());
+            if (filledAnswers.length < 2) return `Вопрос ${i + 1}: добавьте минимум 2 варианта ответа.`;
+        }
+        return null;
+    }
+
+    function submit(e) {
+        e.preventDefault();
+        setValidated(true);
+
+        const err = validate();
+        if (err) {
+            alert(err);
+            return;
+        }
+
+        setSubmitting(true);
+        setErrors({});
+
+        const payload = {
+            title,
+            document_id:   docId || null,
+            passing_score: passingScore,
+            time_limit:    timeLimit || null,
+            max_attempts:  maxAttempts,
+            is_active:     isActive,
+            questions:     questions.map((q, qi) => ({
+                text:    q.text,
+                type:    q.type,
+                order:   qi + 1,
+                answers: q.answers
+                    .filter((a) => a.text.trim())
+                    .map((a, ai) => ({
+                        text:       a.text,
+                        is_correct: a.is_correct,
+                        order:      ai + 1,
+                    })),
+            })),
+        };
+
+        if (isEdit) {
+            router.put(route("admin.tests.update", test.id), payload, {
+                onError:  (e) => { setErrors(e); setSubmitting(false); },
+                onFinish: ()  => setSubmitting(false),
+            });
+        } else {
+            router.post(route("admin.tests.store"), payload, {
+                onError:  (e) => { setErrors(e); setSubmitting(false); },
+                onFinish: ()  => setSubmitting(false),
+            });
+        }
+    }
+
+    return (
+        <AppLayout title={isEdit ? "Редактировать тест" : "Создать тест"}>
+            <Head title={isEdit ? "Редактировать тест" : "Создать тест"} />
+
+            <div className="mb-6">
+                <p className="text-xs text-gray-400">
+                    <Link href={isEdit ? route("admin.tests.show", test.id) : route("admin.tests.index")}
+                        className="hover:underline">
+                        ← {isEdit ? "К тесту" : "Тесты"}
+                    </Link>
+                </p>
+            </div>
+
+            <form onSubmit={submit} className="space-y-6 max-w-2xl">
+
+                {/* ── Настройки ── */}
+                <div className="bg-white rounded-xl border border-gray-100 p-6 space-y-4">
+                    <h2 className="text-sm font-semibold text-gray-700">Настройки теста</h2>
+
+                    <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Название <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            placeholder="Например: Техника безопасности на складе"
+                            className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                errors.title ? "border-red-300" : "border-gray-200"
+                            }`}
+                        />
+                        {errors.title && <p className="mt-1 text-xs text-red-600">{errors.title}</p>}
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Документ <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                            value={docId}
+                            onChange={(e) => setDocId(e.target.value)}
+                            className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white ${
+                                errors.document_id ? "border-red-300" : "border-gray-200"
+                            }`}
+                        >
+                            <option value="">— Выберите документ —</option>
+                            {documents.map((d) => (
+                                <option key={d.id} value={d.id}>{d.title}</option>
+                            ))}
+                        </select>
+                        {errors.document_id && <p className="mt-1 text-xs text-red-600">{errors.document_id}</p>}
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                                Порог сдачи (%) <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="number" min={1} max={100}
+                                value={passingScore}
+                                onChange={(e) => setPassingScore(+e.target.value)}
+                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Лимит времени (мин)</label>
+                            <input
+                                type="number" min={1}
+                                value={timeLimit}
+                                onChange={(e) => setTimeLimit(e.target.value)}
+                                placeholder="Без ограничения"
+                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Попыток</label>
+                            <input
+                                type="number" min={1} max={10}
+                                value={maxAttempts}
+                                onChange={(e) => setMaxAttempts(+e.target.value)}
+                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                        </div>
+                    </div>
+
+                    {isEdit && (
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={isActive}
+                                onChange={(e) => setIsActive(e.target.checked)}
+                                className="w-4 h-4 rounded border-gray-300 accent-blue-600"
+                            />
+                            <span className="text-sm text-gray-700">Тест активен</span>
+                        </label>
+                    )}
+                </div>
+
+                {/* ── Вопросы ── */}
+                <div className="space-y-3">
+                    {questions.map((q, i) => (
+                        <QuestionCard
+                            key={q._id}
+                            q={q}
+                            index={i}
+                            onChange={(updated) => updateQuestion(q._id, updated)}
+                            onRemove={() => removeQuestion(q._id)}
+                            hasError={validated}
+                        />
+                    ))}
+
+                    <button
+                        type="button"
+                        onClick={addQuestion}
+                        className="w-full py-3 border-2 border-dashed border-gray-200 text-gray-400 text-sm rounded-xl hover:border-blue-300 hover:text-blue-500 transition-colors flex items-center justify-center gap-2"
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                        </svg>
+                        Добавить вопрос
+                    </button>
+                </div>
+
+                {/* ── Кнопки ── */}
+                <div className="flex gap-3 pb-8">
+                    <button
+                        type="submit"
+                        disabled={submitting}
+                        className="px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 disabled:opacity-50"
+                    >
+                        {submitting ? "Сохраняем..." : isEdit ? "Сохранить изменения" : "Сохранить тест"}
+                    </button>
+                    <Link
+                        href={isEdit ? route("admin.tests.show", test.id) : route("admin.tests.index")}
+                        className="px-6 py-2.5 border border-gray-200 text-gray-600 text-sm rounded-xl hover:bg-gray-50"
+                    >
+                        Отмена
+                    </Link>
+                </div>
+            </form>
+        </AppLayout>
+    );
+}
