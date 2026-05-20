@@ -15,9 +15,12 @@ git fetch --all --prune
 git reset --hard "origin/$BRANCH"
 git clean -fd
 echo "==> [3/8] Composer install (prod)"
+<<<<<<< HEAD
 echo "==> [3б/8] NPM build"
 npm ci --production=false
 npm run build
+=======
+>>>>>>> 1c2eac4bb65fac451072b360cbd36c441c12a8e1
 composer install --no-dev --optimize-autoloader --prefer-dist
 echo "==> [4/8] Permissions for runtime dirs"
 chgrp -R www-data storage bootstrap/cache public/build 2>/dev/null || true
