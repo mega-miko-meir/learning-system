@@ -139,6 +139,30 @@ class DocumentController extends Controller
         return back()->with('success', 'Документ деактивирован.');
     }
 
+    public function forceDestroy(Document $document)
+    {
+        $title = $document->title;
+        $id    = $document->id;
+
+        // Каскадное удаление через onDelete('cascade') в БД:
+        // test → questions → answers, training_assignments → test_attempts → attempt_answers, training_matrix
+        $document->delete();
+
+        AuditLog::create([
+            'user_id'     => auth()->id(),
+            'user_name'   => auth()->user()->full_name,
+            'action'      => 'delete',
+            'model_type'  => 'Document',
+            'model_id'    => $id,
+            'ip_address'  => request()->ip(),
+            'description' => "Удалён документ: {$title}",
+            'created_at'  => now(),
+        ]);
+
+        return redirect()->route('admin.documents.index')
+            ->with('success', "Документ «{$title}» удалён.");
+    }
+
     public function uploadNewVersion(Request $request, Document $document)
     {
         $request->validate([

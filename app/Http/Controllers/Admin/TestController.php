@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Answer;
+use App\Models\AuditLog;
 use App\Models\Document;
 use App\Models\Question;
 use App\Models\Test;
@@ -162,6 +163,30 @@ class TestController extends Controller
         $test->update(['is_active' => false]);
 
         return back()->with('success', 'Тест деактивирован.');
+    }
+
+    public function forceDestroy(Test $test)
+    {
+        $title = $test->title;
+        $id    = $test->id;
+
+        // Каскадное удаление через onDelete('cascade') в БД:
+        // questions → answers, test_attempts → attempt_answers
+        $test->delete();
+
+        AuditLog::create([
+            'user_id'     => auth()->id(),
+            'user_name'   => auth()->user()->full_name,
+            'action'      => 'delete',
+            'model_type'  => 'Test',
+            'model_id'    => $id,
+            'ip_address'  => request()->ip(),
+            'description' => "Удалён тест: {$title}",
+            'created_at'  => now(),
+        ]);
+
+        return redirect()->route('admin.tests.index')
+            ->with('success', "Тест «{$title}» удалён.");
     }
 
     private function syncQuestions(Test $test, array $questions): void

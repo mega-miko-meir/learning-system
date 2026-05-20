@@ -44,7 +44,7 @@ class MatrixController extends Controller
             'is_mandatory'  => ['boolean'],
         ]);
 
-        TrainingMatrix::firstOrCreate(
+        TrainingMatrix::updateOrCreate(
             ['position_id' => $data['position_id'], 'document_id' => $data['document_id']],
             [...$data, 'is_active' => true]
         );

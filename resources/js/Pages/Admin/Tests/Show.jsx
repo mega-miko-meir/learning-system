@@ -130,6 +130,12 @@ export default function TestShow({ test }) {
         }
     }
 
+    function deleteTest() {
+        if (confirm(`Удалить тест «${test.title}» навсегда?\n\nБудут удалены все вопросы, ответы и результаты прохождений. Это действие нельзя отменить.`)) {
+            router.delete(route("admin.tests.force-delete", test.id));
+        }
+    }
+
     return (
         <AppLayout title={test.title}>
             <Head title={test.title} />
@@ -149,12 +155,20 @@ export default function TestShow({ test }) {
                         </span>
                     </p>
                 </div>
-                <Link
-                    href={route("admin.tests.edit", test.id)}
-                    className="px-4 py-2 border border-gray-200 text-sm rounded-lg hover:bg-gray-50"
-                >
-                    Редактировать
-                </Link>
+                <div className="flex gap-2">
+                    <Link
+                        href={route("admin.tests.edit", test.id)}
+                        className="px-4 py-2 border border-gray-200 text-sm rounded-lg hover:bg-gray-50"
+                    >
+                        Редактировать
+                    </Link>
+                    <button
+                        onClick={deleteTest}
+                        className="px-4 py-2 border border-red-200 text-red-600 text-sm rounded-lg hover:bg-red-50"
+                    >
+                        Удалить
+                    </button>
+                </div>
             </div>
 
             {/* Вопросы */}

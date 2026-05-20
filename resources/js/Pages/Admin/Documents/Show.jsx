@@ -17,6 +17,12 @@ export default function DocumentShow({ document: doc, test }) {
         }
     }
 
+    function deleteDocument() {
+        if (confirm(`Удалить документ «${doc.title}» навсегда?\n\nБудут удалены: тест, вопросы, назначения обучения и все результаты тестов. Это действие нельзя отменить.`)) {
+            router.delete(route("admin.documents.force-delete", doc.id));
+        }
+    }
+
     return (
         <AppLayout title={doc.title}>
             <Head title={doc.title} />
@@ -80,6 +86,12 @@ export default function DocumentShow({ document: doc, test }) {
                                     Деактивировать
                                 </button>
                             )}
+                            <button
+                                onClick={deleteDocument}
+                                className="w-full px-4 py-2 text-sm border border-red-300 text-red-700 rounded-lg hover:bg-red-50"
+                            >
+                                Удалить навсегда
+                            </button>
                         </div>
                     </div>
 

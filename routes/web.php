@@ -73,6 +73,7 @@ Route::middleware(['auth', 'user.active'])->group(function () {
         // Документы
         Route::resource('documents', \App\Http\Controllers\Admin\DocumentController::class);
         Route::post('/documents/{document}/new-version', [\App\Http\Controllers\Admin\DocumentController::class, 'uploadNewVersion'])->name('documents.new-version');
+        Route::delete('/documents/{document}/force', [\App\Http\Controllers\Admin\DocumentController::class, 'forceDestroy'])->name('documents.force-delete');
 
         // Матрица обучения
         Route::get('/matrix', [\App\Http\Controllers\Admin\MatrixController::class, 'index'])->name('matrix.index');
@@ -82,6 +83,7 @@ Route::middleware(['auth', 'user.active'])->group(function () {
 
         // Тесты
         Route::resource('tests', \App\Http\Controllers\Admin\TestController::class);
+        Route::delete('/tests/{test}/force', [\App\Http\Controllers\Admin\TestController::class, 'forceDestroy'])->name('tests.force-delete');
         Route::resource('tests.questions', \App\Http\Controllers\Admin\QuestionController::class)->shallow();
         Route::resource('questions.answers', \App\Http\Controllers\Admin\AnswerController::class)->shallow();
         Route::post('/questions/{question}/reorder-answers', [\App\Http\Controllers\Admin\AnswerController::class, 'reorder'])->name('admin.questions.reorder-answers');
