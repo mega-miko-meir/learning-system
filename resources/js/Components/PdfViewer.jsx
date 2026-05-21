@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -6,40 +6,64 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
     import.meta.url
 ).href;
 
+const RENDER_SCALE = 2;
+const DEFAULT_ZOOM = 85;
+
 export default function PdfViewer({ url }) {
-    const [pdf,         setPdf]         = useState(null);
-    const [totalPages,  setTotalPages]  = useState(0);
+    const [pages,       setPages]       = useState([]);
+    const [total,       setTotal]       = useState(0);
+    const [status,      setStatus]      = useState("loading");
+    const [zoom,        setZoom]        = useState(DEFAULT_ZOOM);
     const [currentPage, setCurrentPage] = useState(1);
     const [pageInput,   setPageInput]   = useState("1");
-    const [scale,       setScale]       = useState(1.0);
-    const [status,      setStatus]      = useState("loading");
-    const [rendering,   setRendering]   = useState(false);
 
-    const canvasRef      = useRef(null);
-    const containerRef   = useRef(null);
-    const renderTaskRef  = useRef(null);
-    const cancelRef      = useRef(false);
+    const cancelRef    = useRef(false);
+    const offscreenRef = useRef(document.createElement("canvas"));
+    const containerRef = useRef(null);
+    const pageRefs     = useRef([]);
 
-    // Загружаем PDF
+    // Загрузка и рендер всех страниц
     useEffect(() => {
         cancelRef.current = false;
+        setPages([]);
+        setTotal(0);
         setStatus("loading");
-        setPdf(null);
         setCurrentPage(1);
         setPageInput("1");
-        setTotalPages(0);
+        pageRefs.current = [];
 
         async function load() {
             try {
                 const { data } = await window.axios.get(url, { responseType: "arraybuffer" });
                 if (cancelRef.current) return;
 
-                const doc = await pdfjsLib.getDocument({ data }).promise;
+                const pdf = await pdfjsLib.getDocument({ data }).promise;
                 if (cancelRef.current) return;
 
-                setPdf(doc);
-                setTotalPages(doc.numPages);
-                setStatus("ready");
+                setTotal(pdf.numPages);
+                const canvas = offscreenRef.current;
+                const collected = [];
+
+                for (let n = 1; n <= pdf.numPages; n++) {
+                    if (cancelRef.current) return;
+
+                    const page     = await pdf.getPage(n);
+                    const viewport = page.getViewport({ scale: RENDER_SCALE });
+
+                    canvas.width  = viewport.width;
+                    canvas.height = viewport.height;
+
+                    const ctx = canvas.getContext("2d");
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    await page.render({ canvasContext: ctx, viewport }).promise;
+
+                    if (cancelRef.current) return;
+
+                    collected.push(canvas.toDataURL("image/png"));
+                    setPages([...collected]);
+                }
+
+                if (!cancelRef.current) setStatus("done");
             } catch (err) {
                 if (!cancelRef.current) {
                     console.error("PdfViewer:", err);
@@ -52,56 +76,36 @@ export default function PdfViewer({ url }) {
         return () => { cancelRef.current = true; };
     }, [url]);
 
-    // Подбираем масштаб "по ширине" после первой загрузки
+    // IntersectionObserver — отслеживаем текущую видимую страницу
     useEffect(() => {
-        if (status !== "ready" || !pdf || !containerRef.current) return;
-        pdf.getPage(1).then(page => {
-            const vp = page.getViewport({ scale: 1 });
-            const containerWidth = containerRef.current.clientWidth - 48;
-            setScale(Math.min(Math.round((containerWidth / vp.width) * 100) / 100, 1.5));
-        });
-    }, [status, pdf]);
+        if (pages.length === 0) return;
 
-    // Рендерим страницу при смене страницы или масштаба
-    useEffect(() => {
-        if (!pdf || !canvasRef.current || status === "loading" || status === "error") return;
+        const observer = new IntersectionObserver(
+            (entries) => {
+                let maxRatio = 0;
+                let visible  = currentPage;
+                entries.forEach((e) => {
+                    if (e.intersectionRatio > maxRatio) {
+                        maxRatio = e.intersectionRatio;
+                        visible  = parseInt(e.target.dataset.page, 10);
+                    }
+                });
+                if (maxRatio > 0) {
+                    setCurrentPage(visible);
+                    setPageInput(String(visible));
+                }
+            },
+            { root: containerRef.current, threshold: [0, 0.25, 0.5, 0.75, 1] }
+        );
 
-        async function renderPage() {
-            setRendering(true);
+        pageRefs.current.forEach((el) => { if (el) observer.observe(el); });
+        return () => observer.disconnect();
+    }, [pages.length]);
 
-            if (renderTaskRef.current) {
-                renderTaskRef.current.cancel();
-                renderTaskRef.current = null;
-            }
-
-            try {
-                const page     = await pdf.getPage(currentPage);
-                const viewport = page.getViewport({ scale });
-                const canvas   = canvasRef.current;
-                if (!canvas) return;
-
-                canvas.width  = viewport.width;
-                canvas.height = viewport.height;
-
-                const ctx = canvas.getContext("2d");
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-                const task = page.render({ canvasContext: ctx, viewport });
-                renderTaskRef.current = task;
-                await task.promise;
-                renderTaskRef.current = null;
-            } catch (err) {
-                if (err.name !== "RenderingCancelledException") console.error(err);
-            } finally {
-                setRendering(false);
-            }
-        }
-
-        renderPage();
-    }, [pdf, currentPage, scale]);
-
-    function goTo(n) {
-        const p = Math.max(1, Math.min(n, totalPages));
+    function scrollToPage(n) {
+        const p = Math.max(1, Math.min(n, total));
+        const el = pageRefs.current[p - 1];
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
         setCurrentPage(p);
         setPageInput(String(p));
     }
@@ -109,32 +113,27 @@ export default function PdfViewer({ url }) {
     function handlePageSubmit(e) {
         e.preventDefault();
         const n = parseInt(pageInput, 10);
-        if (!isNaN(n)) goTo(n);
+        if (!isNaN(n)) scrollToPage(n);
     }
 
     function zoomBy(delta) {
-        setScale(prev => Math.round(Math.max(0.25, Math.min(prev + delta, 3)) * 100) / 100);
+        setZoom(prev => Math.max(40, Math.min(prev + delta, 200)));
     }
 
     function fitWidth() {
-        if (!pdf || !containerRef.current) return;
-        pdf.getPage(currentPage).then(page => {
-            const vp = page.getViewport({ scale: 1 });
-            const w  = containerRef.current.clientWidth - 48;
-            setScale(Math.min(Math.round((w / vp.width) * 100) / 100, 2));
-        });
+        setZoom(DEFAULT_ZOOM);
     }
 
     return (
         <div className="flex flex-col w-full h-full bg-gray-700">
 
             {/* Панель управления */}
-            <div className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-gray-200 text-xs shrink-0 select-none flex-wrap">
+            <div className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-gray-200 text-xs shrink-0 select-none">
 
                 {/* Навигация по страницам */}
                 <div className="flex items-center gap-1">
                     <button
-                        onClick={() => goTo(currentPage - 1)}
+                        onClick={() => scrollToPage(currentPage - 1)}
                         disabled={currentPage <= 1}
                         className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-700 disabled:opacity-30 text-base leading-none"
                     >‹</button>
@@ -148,11 +147,11 @@ export default function PdfViewer({ url }) {
                         />
                     </form>
 
-                    <span className="text-gray-400">/ {totalPages || "—"}</span>
+                    <span className="text-gray-400">/ {total || "—"}</span>
 
                     <button
-                        onClick={() => goTo(currentPage + 1)}
-                        disabled={currentPage >= totalPages}
+                        onClick={() => scrollToPage(currentPage + 1)}
+                        disabled={currentPage >= total}
                         className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-700 disabled:opacity-30 text-base leading-none"
                     >›</button>
                 </div>
@@ -162,16 +161,14 @@ export default function PdfViewer({ url }) {
                 {/* Масштаб */}
                 <div className="flex items-center gap-1">
                     <button
-                        onClick={() => zoomBy(-0.25)}
+                        onClick={() => zoomBy(-10)}
                         className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-700 text-base font-bold"
                     >−</button>
 
-                    <span className="w-12 text-center tabular-nums text-white">
-                        {Math.round(scale * 100)}%
-                    </span>
+                    <span className="w-12 text-center tabular-nums text-white">{zoom}%</span>
 
                     <button
-                        onClick={() => zoomBy(0.25)}
+                        onClick={() => zoomBy(10)}
                         className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-700 text-base font-bold"
                     >+</button>
 
@@ -183,19 +180,21 @@ export default function PdfViewer({ url }) {
                     </button>
                 </div>
 
-                {rendering && (
-                    <span className="ml-auto text-gray-500 text-xs">Рендеринг…</span>
+                {status === "loading" && (
+                    <span className="ml-auto text-gray-500">
+                        {pages.length > 0 ? `${pages.length} / ${total}…` : "Загрузка…"}
+                    </span>
                 )}
             </div>
 
-            {/* Область страницы */}
+            {/* Страницы */}
             <div
                 ref={containerRef}
-                className="flex-1 overflow-auto p-6 flex justify-center items-start select-none bg-gray-600"
+                className="flex-1 overflow-y-auto overflow-x-auto p-4 bg-gray-600 select-none"
                 onContextMenu={(e) => e.preventDefault()}
                 onDragStart={(e) => e.preventDefault()}
             >
-                {status === "loading" && (
+                {status === "loading" && pages.length === 0 && (
                     <div className="flex flex-col items-center justify-center mt-20 text-gray-300 text-sm gap-3">
                         <div className="w-8 h-8 border-2 border-gray-400 border-t-white rounded-full animate-spin" />
                         Загрузка документа…
@@ -203,16 +202,30 @@ export default function PdfViewer({ url }) {
                 )}
 
                 {status === "error" && (
-                    <p className="mt-20 text-red-300 text-sm">
+                    <p className="mt-20 text-center text-red-300 text-sm">
                         Не удалось загрузить документ. Обратитесь к администратору.
                     </p>
                 )}
 
-                {(status === "ready" || status === "done") && (
-                    <div className={`shadow-2xl transition-opacity duration-150 ${rendering ? "opacity-60" : "opacity-100"}`}>
-                        <canvas ref={canvasRef} className="block" style={{ maxWidth: "none" }} />
-                    </div>
-                )}
+                <div className="flex flex-col items-center gap-3">
+                    {pages.map((src, i) => (
+                        <div
+                            key={i}
+                            ref={(el) => (pageRefs.current[i] = el)}
+                            data-page={i + 1}
+                            className="shadow-xl shrink-0"
+                            style={{ width: `${zoom}%` }}
+                        >
+                            <img
+                                src={src}
+                                alt={`Страница ${i + 1}`}
+                                className="w-full block"
+                                draggable="false"
+                                onContextMenu={(e) => e.preventDefault()}
+                            />
+                        </div>
+                    ))}
+                </div>
             </div>
         </div>
     );

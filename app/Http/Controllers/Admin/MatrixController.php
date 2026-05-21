@@ -21,12 +21,13 @@ class MatrixController extends Controller
             ->orderBy('position_id')
             ->get()
             ->map(fn($m) => [
-                'id'            => $m->id,
-                'position'      => $m->position->name,
-                'department'    => $m->position->department?->name,
-                'document'      => $m->document->title,
-                'training_type' => $m->training_type,
-                'is_mandatory'  => $m->is_mandatory,
+                'id'                       => $m->id,
+                'position'                 => $m->position->name,
+                'department'               => $m->position->department?->name,
+                'document'                 => $m->document->title,
+                'training_type'            => $m->training_type,
+                'is_mandatory'             => $m->is_mandatory,
+                'required_reading_minutes' => $m->required_reading_minutes,
             ]);
 
         $positions = Position::active()->with('department')->orderBy('name')->get(['id', 'name', 'department_id']);
@@ -38,10 +39,11 @@ class MatrixController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'position_id'   => ['required', 'exists:positions,id'],
-            'document_id'   => ['required', 'exists:documents,id'],
-            'training_type' => ['required', Rule::in(['primary', 'periodic', 'unplanned', 'special'])],
-            'is_mandatory'  => ['boolean'],
+            'position_id'              => ['required', 'exists:positions,id'],
+            'document_id'              => ['required', 'exists:documents,id'],
+            'training_type'            => ['required', Rule::in(['primary', 'periodic', 'unplanned', 'special'])],
+            'is_mandatory'             => ['boolean'],
+            'required_reading_minutes' => ['required', 'integer', 'min:1', 'max:9999'],
         ]);
 
         TrainingMatrix::updateOrCreate(
@@ -50,6 +52,28 @@ class MatrixController extends Controller
         );
 
         return back()->with('success', 'Запись добавлена в матрицу.');
+    }
+
+    public function update(Request $request, TrainingMatrix $matrix)
+    {
+        $data = $request->validate([
+            'training_type'            => ['required', Rule::in(['primary', 'periodic', 'unplanned', 'special'])],
+            'is_mandatory'             => ['boolean'],
+            'required_reading_minutes' => ['required', 'integer', 'min:1', 'max:9999'],
+        ]);
+
+        $matrix->update($data);
+
+        $updated = TrainingAssignment::where('matrix_id', $matrix->id)
+            ->whereIn('status', ['pending', 'in_progress'])
+            ->update(['required_reading_minutes' => $data['required_reading_minutes']]);
+
+        $message = 'Запись матрицы обновлена.';
+        if ($updated > 0) {
+            $message .= " Обновлено активных назначений: {$updated}.";
+        }
+
+        return back()->with('success', $message);
     }
 
     public function destroy(TrainingMatrix $matrix)
@@ -79,12 +103,13 @@ class MatrixController extends Controller
 
                 if (!$exists) {
                     TrainingAssignment::create([
-                        'user_id'       => $user->id,
-                        'document_id'   => $item->document_id,
-                        'matrix_id'     => $item->id,
-                        'training_type' => $item->training_type,
-                        'status'        => 'pending',
-                        'due_date'      => now()->addDays(30),
+                        'user_id'                  => $user->id,
+                        'document_id'              => $item->document_id,
+                        'matrix_id'                => $item->id,
+                        'training_type'            => $item->training_type,
+                        'status'                   => 'pending',
+                        'due_date'                 => now()->addDays(30),
+                        'required_reading_minutes' => $item->required_reading_minutes,
                     ]);
                     $created++;
                 }

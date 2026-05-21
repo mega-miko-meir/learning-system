@@ -268,7 +268,7 @@ class UserController extends Controller
                     'training_type'            => $item->training_type,
                     'status'                   => 'pending',
                     'due_date'                 => now()->addDays(30),
-                    'required_reading_minutes' => 10,
+                    'required_reading_minutes' => $item->required_reading_minutes,
                 ]);
             }
         }

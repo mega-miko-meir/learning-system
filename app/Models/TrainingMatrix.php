@@ -13,14 +13,15 @@ class TrainingMatrix extends Model
 
     protected $fillable = [
         'position_id', 'document_id', 'training_type',
-        'is_mandatory', 'is_active',
+        'is_mandatory', 'is_active', 'required_reading_minutes',
     ];
 
     protected function casts(): array
     {
         return [
-            'is_mandatory' => 'boolean',
-            'is_active'    => 'boolean',
+            'is_mandatory'             => 'boolean',
+            'is_active'                => 'boolean',
+            'required_reading_minutes' => 'integer',
         ];
     }
 
