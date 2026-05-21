@@ -12,7 +12,7 @@ class DepartmentController extends Controller
 {
     public function index()
     {
-        $departments = Department::withCount('users')
+        $departments = Department::withCount(['users' => fn($q) => $q->active()])
             ->orderBy('name')
             ->paginate(20)
             ->through(fn($d) => [

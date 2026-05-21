@@ -117,6 +117,7 @@ export default function SuperAdminUsersIndex({ users }) {
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Email / Телефон</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Отдел</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Роль и статус</th>
+                            <th className="px-4 py-3" />
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -131,6 +132,14 @@ export default function SuperAdminUsersIndex({ users }) {
                                 <td className="px-4 py-3 text-gray-500 text-xs">{u.department ?? "—"}</td>
                                 <td className="px-4 py-3">
                                     <RoleSelector user={u} />
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                    <Link
+                                        href={route("admin.users.show", u.id)}
+                                        className="text-xs text-blue-600 hover:underline"
+                                    >
+                                        Открыть
+                                    </Link>
                                 </td>
                             </tr>
                         ))}

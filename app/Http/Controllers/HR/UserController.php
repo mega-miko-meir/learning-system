@@ -18,6 +18,7 @@ class UserController extends Controller
     public function index(Request $request)
     {
         $users = User::with(['department', 'position', 'manager'])
+            ->where('role', '!=', 'superadmin')
             ->when($request->search, fn($q, $s) =>
                 $q->where(fn($q) =>
                     $q->where('last_name', 'like', "%$s%")
@@ -69,12 +70,13 @@ class UserController extends Controller
         ]);
 
         $tempPassword = 'Temp' . rand(1000, 9999) . '!';
+        $mustChange   = $request->boolean('must_change_password', true);
 
         $user = User::create([
             ...$data,
             'role'                 => 'employee',
             'password'             => Hash::make($tempPassword),
-            'must_change_password' => true,
+            'must_change_password' => $mustChange,
             'is_active'            => true,
         ]);
 
@@ -95,7 +97,8 @@ class UserController extends Controller
         ]);
 
         return redirect()->route('hr.users.show', $user)
-            ->with('success', "Сотрудник создан. Временный пароль: {$tempPassword}");
+            ->with('success', 'Сотрудник успешно создан.')
+            ->with('temp_password', $tempPassword);
     }
 
     public function show(User $user)
@@ -222,10 +225,11 @@ class UserController extends Controller
     public function resetPassword(Request $request, User $user)
     {
         $tempPassword = 'Temp' . rand(1000, 9999) . '!';
+        $mustChange   = $request->boolean('must_change_password', true);
 
         $user->update([
             'password'             => Hash::make($tempPassword),
-            'must_change_password' => true,
+            'must_change_password' => $mustChange,
         ]);
 
         AuditLog::create([
@@ -239,7 +243,9 @@ class UserController extends Controller
             'created_at'  => now(),
         ]);
 
-        return back()->with('success', "Новый временный пароль: {$tempPassword}");
+        return back()
+            ->with('success', 'Пароль сброшен.')
+            ->with('temp_password', $tempPassword);
     }
 
     private function assignTrainingByPosition(User $user): void

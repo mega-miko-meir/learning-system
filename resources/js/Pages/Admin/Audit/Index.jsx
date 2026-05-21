@@ -1,4 +1,4 @@
-import { Head, router } from "@inertiajs/react";
+import { Head, router, usePage } from "@inertiajs/react";
 import AppLayout from "../../../Layouts/AppLayout";
 import Pagination from "../../../Components/Pagination";
 
@@ -23,6 +23,8 @@ const ACTION_COLORS = {
 };
 
 export default function AuditIndex({ logs, users }) {
+    const { auth } = usePage().props;
+    const showIp = auth.user?.role === "superadmin";
     const params = Object.fromEntries(new URLSearchParams(window.location.search));
 
     function filter(key, value) {
@@ -82,13 +84,13 @@ export default function AuditIndex({ logs, users }) {
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Пользователь</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Действие</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Описание</th>
-                            <th className="text-left px-4 py-3 font-medium text-gray-600">IP</th>
+                            {showIp && <th className="text-left px-4 py-3 font-medium text-gray-600">IP</th>}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                         {logs.data.length === 0 ? (
                             <tr>
-                                <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
+                                <td colSpan={showIp ? 5 : 4} className="px-4 py-8 text-center text-gray-400">
                                     Записей нет
                                 </td>
                             </tr>
@@ -109,7 +111,7 @@ export default function AuditIndex({ logs, users }) {
                                     <td className="px-4 py-3 text-gray-600 max-w-xs truncate">
                                         {log.description}
                                     </td>
-                                    <td className="px-4 py-3 text-gray-400 text-xs">{log.ip_address}</td>
+                                    {showIp && <td className="px-4 py-3 text-gray-400 text-xs">{log.ip_address}</td>}
                                 </tr>
                             ))
                         )}

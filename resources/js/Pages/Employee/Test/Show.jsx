@@ -123,7 +123,7 @@ export default function TestShow({ assignment, test, attempt_id }) {
 
                         {result.blocked && (
                             <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 text-sm text-red-700">
-                                Использованы все попытки. Доступ заблокирован. Обратитесь к администратору.
+                                Все попытки исчерпаны. Тест не пройден. Обратитесь к администратору.
                             </div>
                         )}
 

@@ -264,22 +264,37 @@ export default function AssignmentsIndex({ assignments, departments, positions, 
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Документ</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Вид</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Статус</th>
-                            <th className="text-left px-4 py-3 font-medium text-gray-600">Срок / Завершено</th>
+                            <th className="text-left px-4 py-3 font-medium text-gray-600">Срок</th>
+                            <th className="text-left px-4 py-3 font-medium text-gray-600">Сдача теста</th>
                             <th className="text-right px-4 py-3 font-medium text-gray-600">Действия</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                         {assignments.data.length === 0 ? (
                             <tr>
-                                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
                                     Назначений нет
                                 </td>
                             </tr>
                         ) : (
                             assignments.data.map((a) => (
                                 <tr key={a.id} className="hover:bg-gray-50">
-                                    <td className="px-4 py-3 text-gray-900">{a.user}</td>
-                                    <td className="px-4 py-3 text-gray-600">{a.document}</td>
+                                    <td className="px-4 py-3">
+                                        <Link
+                                            href={route("admin.users.show", a.user_id)}
+                                            className="text-gray-900 hover:text-blue-600 hover:underline"
+                                        >
+                                            {a.user}
+                                        </Link>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <Link
+                                            href={route("admin.documents.show", a.document_id)}
+                                            className="text-gray-600 hover:text-blue-600 hover:underline text-sm"
+                                        >
+                                            {a.document}
+                                        </Link>
+                                    </td>
                                     <td className="px-4 py-3 text-gray-400 text-xs">
                                         {TRAINING_TYPES.find((t) => t.value === a.type)?.label ?? a.type}
                                     </td>
@@ -295,7 +310,10 @@ export default function AssignmentsIndex({ assignments, departments, positions, 
                                         </span>
                                     </td>
                                     <td className="px-4 py-3 text-gray-400 text-xs">
-                                        {a.completed_at ?? a.due_date ?? "—"}
+                                        {a.due_date ?? "—"}
+                                    </td>
+                                    <td className="px-4 py-3 text-gray-400 text-xs">
+                                        {a.completed_at ?? "—"}
                                     </td>
                                     <td className="px-4 py-3">
                                         <div className="flex items-center justify-end gap-1">

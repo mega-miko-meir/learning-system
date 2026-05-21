@@ -19,6 +19,7 @@ class UserController extends Controller
     public function index(Request $request)
     {
         $users = User::with(['department', 'position', 'manager'])
+            ->where('role', '!=', 'superadmin')
             ->when($request->search, fn($q, $s) =>
                 $q->where(fn($q) =>
                     $q->where('last_name', 'like', "%$s%")
@@ -29,8 +30,8 @@ class UserController extends Controller
             )
             ->when($request->department_id, fn($q, $d) => $q->where('department_id', $d))
             ->when($request->role, fn($q, $r) => $q->where('role', $r))
-            ->when($request->status === 'active', fn($q) => $q->active())
             ->when($request->status === 'inactive', fn($q) => $q->where('is_active', false))
+            ->when($request->status !== 'inactive' && $request->status !== 'all', fn($q) => $q->active())
             ->orderBy('last_name')
             ->paginate(20)
             ->withQueryString()
@@ -45,6 +46,7 @@ class UserController extends Controller
                 'position'   => $u->position?->name,
                 'is_active'  => $u->is_active,
                 'hired_at'   => $u->hired_at?->format('d.m.Y'),
+                'fired_at'   => $u->fired_at?->format('d.m.Y'),
             ]);
 
         $departments = Department::active()->orderBy('name')->get(['id', 'name']);
@@ -77,11 +79,12 @@ class UserController extends Controller
         ]);
 
         $tempPassword = 'Temp' . rand(1000, 9999) . '!';
+        $mustChange   = $request->boolean('must_change_password', true);
 
         $user = User::create([
             ...$data,
             'password'             => Hash::make($tempPassword),
-            'must_change_password' => true,
+            'must_change_password' => $mustChange,
             'is_active'            => true,
         ]);
 
@@ -103,7 +106,8 @@ class UserController extends Controller
         ]);
 
         return redirect()->route('admin.users.show', $user)
-            ->with('success', "Сотрудник создан. Временный пароль: {$tempPassword}");
+            ->with('success', 'Сотрудник успешно создан.')
+            ->with('temp_password', $tempPassword);
     }
 
     public function show(User $user)
@@ -236,10 +240,11 @@ class UserController extends Controller
     public function resetPassword(Request $request, User $user)
     {
         $tempPassword = 'Temp' . rand(1000, 9999) . '!';
+        $mustChange   = $request->boolean('must_change_password', true);
 
         $user->update([
             'password'             => Hash::make($tempPassword),
-            'must_change_password' => true,
+            'must_change_password' => $mustChange,
         ]);
 
         AuditLog::create([
@@ -253,7 +258,9 @@ class UserController extends Controller
             'created_at' => now(),
         ]);
 
-        return back()->with('success', "Новый временный пароль: {$tempPassword}");
+        return back()
+            ->with('success', 'Пароль сброшен.')
+            ->with('temp_password', $tempPassword);
     }
 
     public function assignTraining(User $user)

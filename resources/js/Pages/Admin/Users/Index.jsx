@@ -75,9 +75,9 @@ export default function UsersIndex({ users, departments }) {
                     onChange={(e) => filter("status", e.target.value)}
                     className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                    <option value="">Все статусы</option>
-                    <option value="active">Активные</option>
+                    <option value="">Активные</option>
                     <option value="inactive">Неактивные</option>
+                    <option value="all">Все сотрудники</option>
                 </select>
 
                 <Link
@@ -97,6 +97,7 @@ export default function UsersIndex({ users, departments }) {
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Отдел</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Должность</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Контакт</th>
+                            <th className="text-left px-4 py-3 font-medium text-gray-600">Приём / Увольнение</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Статус</th>
                             <th className="px-4 py-3" />
                         </tr>
@@ -104,7 +105,7 @@ export default function UsersIndex({ users, departments }) {
                     <tbody className="divide-y divide-gray-50">
                         {users.data.length === 0 ? (
                             <tr>
-                                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
+                                <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
                                     Сотрудников не найдено
                                 </td>
                             </tr>
@@ -121,6 +122,12 @@ export default function UsersIndex({ users, departments }) {
                                     <td className="px-4 py-3 text-gray-500">{u.position ?? "—"}</td>
                                     <td className="px-4 py-3 text-gray-400 text-xs">
                                         {u.email ?? u.phone ?? "—"}
+                                    </td>
+                                    <td className="px-4 py-3 text-xs">
+                                        {u.is_active
+                                            ? <span className="text-gray-400">{u.hired_at ?? "—"}</span>
+                                            : <span className="text-red-400">{u.fired_at ?? u.hired_at ?? "—"}</span>
+                                        }
                                     </td>
                                     <td className="px-4 py-3">
                                         <span className={`text-xs px-2 py-0.5 rounded-full ${

@@ -1,4 +1,5 @@
 import { Head, Link } from "@inertiajs/react";
+import { usePage } from "@inertiajs/react";
 import AppLayout from "../../Layouts/AppLayout";
 
 const STATUS_LABELS = {
@@ -9,9 +10,25 @@ const STATUS_LABELS = {
 };
 
 export default function Dashboard({ stats, upcoming }) {
+    const { auth } = usePage().props;
+    const user = auth.user;
+
     return (
         <AppLayout title="Мой кабинет">
             <Head title="Мой кабинет" />
+
+            <div className="bg-white rounded-xl border border-gray-100 p-5 mb-6 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-xl font-bold text-blue-700 shrink-0">
+                    {user.full_name.charAt(0)}
+                </div>
+                <div>
+                    <p className="font-semibold text-gray-900">{user.full_name}</p>
+                    <p className="text-sm text-gray-500">{user.position ?? "—"}</p>
+                    {user.department && (
+                        <p className="text-xs text-gray-400">{user.department}</p>
+                    )}
+                </div>
+            </div>
 
             <div className="grid grid-cols-3 gap-4 mb-8">
                 <div className="bg-white rounded-xl border border-gray-100 p-5">

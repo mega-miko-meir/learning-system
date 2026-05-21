@@ -84,7 +84,7 @@ function FlashMessage() {
     return null;
 }
 
-export default function AppLayout({ children, title }) {
+export default function AppLayout({ children, title, fullHeight = false }) {
     const { user } = useAuth();
     const { url } = usePage();
     const navItems = NAV_ITEMS[user?.role] ?? [];
@@ -174,15 +174,17 @@ export default function AppLayout({ children, title }) {
             </aside>
 
             {/* Основной контент */}
-            <main className="flex-1 overflow-y-auto">
+            <main className={`flex-1 min-w-0 flex flex-col ${fullHeight ? "overflow-hidden" : "overflow-y-auto"}`}>
                 {title && (
-                    <div className="px-8 py-6 border-b border-gray-100 bg-white">
+                    <div className="px-8 py-6 border-b border-gray-100 bg-white shrink-0">
                         <h1 className="text-xl font-bold text-gray-900">
                             {title}
                         </h1>
                     </div>
                 )}
-                <div className="px-8 py-6">{children}</div>
+                <div className={fullHeight ? "flex flex-col flex-1 min-h-0" : "px-8 py-6"}>
+                    {children}
+                </div>
             </main>
 
             <FlashMessage />

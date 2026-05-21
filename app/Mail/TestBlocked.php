@@ -21,7 +21,7 @@ class TestBlocked extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Сотрудник заблокирован: ' . $this->assignment->user->full_name . ' — ' . $this->assignment->document->title,
+            subject: 'Сотрудник не прошёл тест: ' . $this->assignment->user->full_name . ' — ' . $this->assignment->document->title,
         );
     }
 

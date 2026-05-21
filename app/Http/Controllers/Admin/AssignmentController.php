@@ -28,7 +28,9 @@ class AssignmentController extends Controller
             ->withQueryString()
             ->through(fn($a) => [
                 'id'              => $a->id,
+                'user_id'         => $a->user->id,
                 'user'            => $a->user->full_name,
+                'document_id'     => $a->document->id,
                 'document'        => $a->document->title,
                 'type'            => $a->training_type,
                 'status'          => $a->status,

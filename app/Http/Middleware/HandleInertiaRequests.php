@@ -26,13 +26,15 @@ class HandleInertiaRequests extends Middleware
                     'email'                => $request->user()->email,
                     'phone'                => $request->user()->phone,
                     'department'           => $request->user()->department?->name,
+                    'position'             => $request->user()->position?->name,
                     'must_change_password' => $request->user()->must_change_password,
                 ] : null,
             ],
             'flash' => [
-                'success' => fn () => $request->session()->get('success'),
-                'error'   => fn () => $request->session()->get('error'),
-                'info'    => fn () => $request->session()->get('info'),
+                'success'      => fn () => $request->session()->get('success'),
+                'error'        => fn () => $request->session()->get('error'),
+                'info'         => fn () => $request->session()->get('info'),
+                'temp_password' => fn () => $request->session()->get('temp_password'),
             ],
         ]);
     }

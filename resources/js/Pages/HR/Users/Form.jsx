@@ -5,14 +5,15 @@ export default function HRUserForm({ user, departments, managers }) {
     const isEdit = !!user;
 
     const { data, setData, post, put, processing, errors } = useForm({
-        last_name:     user?.last_name     ?? "",
-        first_name:    user?.first_name    ?? "",
-        middle_name:   user?.middle_name   ?? "",
-        phone:         user?.phone         ?? "",
-        department_id: user?.department_id ?? "",
-        position_id:   user?.position_id   ?? "",
-        manager_id:    user?.manager_id    ?? "",
-        hired_at:      user?.hired_at      ?? "",
+        last_name:            user?.last_name     ?? "",
+        first_name:           user?.first_name    ?? "",
+        middle_name:          user?.middle_name   ?? "",
+        phone:                user?.phone         ?? "",
+        department_id:        user?.department_id ?? "",
+        position_id:          user?.position_id   ?? "",
+        manager_id:           user?.manager_id    ?? "",
+        hired_at:             user?.hired_at      ?? "",
+        must_change_password: true,
     });
 
     const availablePositions = departments
@@ -106,6 +107,18 @@ export default function HRUserForm({ user, departments, managers }) {
                                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                         </div>
                     </div>
+
+                    {!isEdit && (
+                        <label className="flex items-center gap-2.5 text-sm text-gray-700 cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                checked={data.must_change_password}
+                                onChange={(e) => setData("must_change_password", e.target.checked)}
+                                className="w-4 h-4 accent-blue-600"
+                            />
+                            Потребовать смену пароля при первом входе
+                        </label>
+                    )}
 
                     <div className="flex gap-3 pt-2">
                         <button type="submit" disabled={processing}

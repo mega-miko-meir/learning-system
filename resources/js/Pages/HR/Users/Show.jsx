@@ -1,5 +1,7 @@
 import { Head, Link, router } from "@inertiajs/react";
+import { useEffect, useState } from "react";
 import AppLayout from "../../../Layouts/AppLayout";
+import { useFlash } from "../../../hooks/useAuth";
 
 const STATUS_MAP = {
     pending:     { label: "Ожидает",     cls: "bg-yellow-50 text-yellow-700" },
@@ -9,7 +11,131 @@ const STATUS_MAP = {
     expired:     { label: "Просрочено",  cls: "bg-gray-100 text-gray-500" },
 };
 
+function TempPasswordModal({ title, password, employee, onClose }) {
+    const [copiedAll, setCopiedAll] = useState(false);
+
+    const login = employee?.phone ?? employee?.email ?? "—";
+
+    const credentialsText =
+        `ФИО: ${employee?.full_name ?? "—"}\n` +
+        `Логин: ${login}\n` +
+        `Пароль: ${password}`;
+
+    function copyAll() {
+        navigator.clipboard.writeText(credentialsText).catch(() => {});
+        setCopiedAll(true);
+        setTimeout(() => setCopiedAll(false), 2000);
+    }
+
+    return (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-sm mx-4 shadow-xl">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                        <span className="text-green-600 text-lg">✓</span>
+                    </div>
+                    <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+                </div>
+
+                {/* Блок данных для копирования */}
+                <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-3 mb-3 space-y-1.5 text-sm">
+                    <div className="flex justify-between gap-2">
+                        <span className="text-gray-400 shrink-0">ФИО</span>
+                        <span className="text-gray-900 font-medium text-right">{employee?.full_name ?? "—"}</span>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                        <span className="text-gray-400 shrink-0">Логин</span>
+                        <span className="font-mono text-gray-900">{login}</span>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                        <span className="text-gray-400 shrink-0">Пароль</span>
+                        <span className="font-mono text-gray-900 select-all">{password}</span>
+                    </div>
+                </div>
+
+                <button
+                    onClick={copyAll}
+                    className={`w-full px-4 py-2 text-sm rounded-lg font-medium mb-2 transition-colors ${
+                        copiedAll
+                            ? "bg-green-600 text-white"
+                            : "bg-blue-600 text-white hover:bg-blue-700"
+                    }`}
+                >
+                    {copiedAll ? "Скопировано ✓" : "Скопировать данные"}
+                </button>
+
+                <p className="text-xs text-gray-400 mb-3 text-center">
+                    После закрытия пароль больше не будет виден
+                </p>
+                <button
+                    onClick={onClose}
+                    className="w-full px-4 py-2 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50"
+                >
+                    Закрыть
+                </button>
+            </div>
+        </div>
+    );
+}
+
+function ResetPasswordModal({ onConfirm, onClose }) {
+    const [mustChange, setMustChange] = useState(true);
+
+    return (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-sm mx-4 shadow-xl">
+                <h3 className="text-base font-semibold text-gray-900 mb-1">Сброс пароля</h3>
+                <p className="text-sm text-gray-500 mb-4">
+                    Будет создан новый временный пароль.
+                </p>
+                <label className="flex items-center gap-2.5 text-sm text-gray-700 mb-6 cursor-pointer select-none">
+                    <input
+                        type="checkbox"
+                        checked={mustChange}
+                        onChange={(e) => setMustChange(e.target.checked)}
+                        className="w-4 h-4 accent-blue-600"
+                    />
+                    Потребовать смену пароля при первом входе
+                </label>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => onConfirm(mustChange)}
+                        className="flex-1 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
+                    >
+                        Сбросить
+                    </button>
+                    <button
+                        onClick={onClose}
+                        className="flex-1 px-4 py-2 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50"
+                    >
+                        Отмена
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function HRUserShow({ employee, assignments }) {
+    const flash = useFlash();
+
+    const [tempPassword, setTempPassword]           = useState(null);
+    const [showPasswordModal, setShowPasswordModal] = useState(false);
+    const [showResetModal, setShowResetModal]        = useState(false);
+    const [passwordModalTitle, setPasswordModalTitle] = useState("");
+
+    useEffect(() => {
+        if (flash.temp_password) {
+            setTempPassword(flash.temp_password);
+            setPasswordModalTitle(
+                flash.success === "Сотрудник успешно создан."
+                    ? "Сотрудник успешно создан"
+                    : "Пароль сброшен"
+            );
+            setShowPasswordModal(true);
+        }
+    }, [flash.temp_password]);
+
     const completed = assignments.filter((a) => a.status === "completed").length;
     const percent   = assignments.length > 0 ? Math.round(completed / assignments.length * 100) : 0;
 
@@ -23,15 +149,32 @@ export default function HRUserShow({ employee, assignments }) {
         router.post(route("hr.users.activate", employee.id));
     }
 
-    function resetPassword() {
-        if (confirm("Сбросить пароль? Новый временный пароль будет показан в сообщении.")) {
-            router.post(route("hr.users.reset-password", employee.id));
-        }
+    function submitReset(mustChange) {
+        setShowResetModal(false);
+        router.post(route("hr.users.reset-password", employee.id), {
+            must_change_password: mustChange,
+        });
     }
 
     return (
         <AppLayout title={employee.full_name}>
             <Head title={employee.full_name} />
+
+            {showPasswordModal && tempPassword && (
+                <TempPasswordModal
+                    title={passwordModalTitle}
+                    password={tempPassword}
+                    employee={employee}
+                    onClose={() => setShowPasswordModal(false)}
+                />
+            )}
+
+            {showResetModal && (
+                <ResetPasswordModal
+                    onConfirm={submitReset}
+                    onClose={() => setShowResetModal(false)}
+                />
+            )}
 
             <p className="text-xs text-gray-400 mb-6">
                 <Link href={route("hr.users.index")} className="hover:underline">← Сотрудники</Link>
@@ -70,7 +213,8 @@ export default function HRUserShow({ employee, assignments }) {
                                 className="block w-full text-center px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
                                 Редактировать
                             </Link>
-                            <button onClick={resetPassword}
+                            <button
+                                onClick={() => setShowResetModal(true)}
                                 className="block w-full text-center px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
                                 Сбросить пароль
                             </button>
