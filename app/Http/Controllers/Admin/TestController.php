@@ -51,7 +51,7 @@ class TestController extends Controller
 
         $request->validate([
             'title'                            => ['required', 'string', 'max:255'],
-            'document_id'                      => ['required', 'exists:documents,id'],
+            'document_id'                      => ['nullable', 'exists:documents,id'],
             'passing_score'                    => ['required', 'integer', 'min:1', 'max:100'],
             'time_limit'                       => ['nullable', 'integer', 'min:1'],
             'max_attempts'                     => ['required', 'integer', 'min:1', 'max:10'],
@@ -128,7 +128,7 @@ class TestController extends Controller
 
         $request->validate([
             'title'                            => ['required', 'string', 'max:255'],
-            'document_id'                      => ['required', 'exists:documents,id'],
+            'document_id'                      => ['nullable', 'exists:documents,id'],
             'passing_score'                    => ['required', 'integer', 'min:1', 'max:100'],
             'time_limit'                       => ['nullable', 'integer', 'min:1'],
             'max_attempts'                     => ['required', 'integer', 'min:1', 'max:10'],

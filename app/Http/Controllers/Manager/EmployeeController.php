@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Manager;
 use App\Http\Controllers\Controller;
 use App\Models\TrainingAssignment;
 use App\Models\User;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -41,7 +42,11 @@ class EmployeeController extends Controller
 
         $user->load(['department', 'position']);
 
-        $assignments = TrainingAssignment::with(['document', 'testAttempts'])
+        $assignments = TrainingAssignment::with([
+                'document',
+                'testAttempts.attemptAnswers.question',
+                'testAttempts.attemptAnswers.answer',
+            ])
             ->where('user_id', $user->id)
             ->latest()
             ->get()
@@ -53,6 +58,18 @@ class EmployeeController extends Controller
                 'due_date'     => $a->due_date?->format('d.m.Y'),
                 'completed_at' => $a->completed_at?->format('d.m.Y'),
                 'best_score'   => $a->testAttempts->max('score_percentage'),
+                'attempts'     => $a->testAttempts->map(fn($att) => [
+                    'id'             => $att->id,
+                    'attempt_number' => $att->attempt_number,
+                    'score'          => $att->score_percentage,
+                    'passed'         => $att->is_passed,
+                    'finished_at'    => $att->finished_at?->format('d.m.Y H:i'),
+                    'answers'        => $att->attemptAnswers->map(fn($aa) => [
+                        'question'   => $aa->question?->question_text,
+                        'chosen'     => $aa->answer?->answer_text,
+                        'is_correct' => $aa->is_correct,
+                    ]),
+                ])->sortBy('attempt_number')->values(),
             ]);
 
         return Inertia::render('Manager/Employees/Show', [
@@ -65,5 +82,32 @@ class EmployeeController extends Controller
             ],
             'assignments' => $assignments,
         ]);
+    }
+
+    public function pdf(User $user)
+    {
+        abort_if($user->manager_id !== Auth::id(), 403);
+
+        $user->load(['department', 'position', 'manager']);
+
+        $assignments = TrainingAssignment::with(['document', 'testAttempts'])
+            ->where('user_id', $user->id)
+            ->latest()
+            ->get();
+
+        $total     = $assignments->count();
+        $completed = $assignments->where('status', 'completed')->count();
+        $pending   = $assignments->whereIn('status', ['pending', 'in_progress'])->count();
+        $percent   = $total > 0 ? round($completed / $total * 100) : 0;
+
+        $employee = $user;
+
+        $pdf = Pdf::loadView('reports.employee_pdf', compact(
+            'employee', 'assignments', 'total', 'completed', 'pending', 'percent'
+        ))->setPaper('a4', 'portrait');
+
+        $filename = 'report_' . str_replace(' ', '_', $user->full_name) . '_' . now()->format('Ymd') . '.pdf';
+
+        return $pdf->download($filename);
     }
 }

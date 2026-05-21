@@ -286,7 +286,8 @@ export default function TestCreate({ documents, document_id, test }) {
 
                     <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">
-                            Документ <span className="text-red-500">*</span>
+                            Документ
+                            <span className="text-gray-400 font-normal ml-1">(необязательно)</span>
                         </label>
                         <select
                             value={docId}
@@ -295,7 +296,7 @@ export default function TestCreate({ documents, document_id, test }) {
                                 errors.document_id ? "border-red-300" : "border-gray-200"
                             }`}
                         >
-                            <option value="">— Выберите документ —</option>
+                            <option value="">— Без документа —</option>
                             {documents.map((d) => (
                                 <option key={d.id} value={d.id}>{d.title}</option>
                             ))}

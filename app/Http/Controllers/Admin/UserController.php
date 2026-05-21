@@ -114,19 +114,34 @@ class UserController extends Controller
     {
         $user->load(['department', 'position', 'manager']);
 
-        $assignments = TrainingAssignment::with(['document', 'testAttempts'])
+        $assignments = TrainingAssignment::with([
+                'document',
+                'testAttempts.attemptAnswers.question',
+                'testAttempts.attemptAnswers.answer',
+            ])
             ->where('user_id', $user->id)
             ->latest()
             ->get()
             ->map(fn($a) => [
-                'id'            => $a->id,
-                'document'      => $a->document->title,
-                'type'          => $a->training_type,
-                'status'        => $a->status,
-                'due_date'      => $a->due_date?->format('d.m.Y'),
-                'completed_at'  => $a->completed_at?->format('d.m.Y'),
-                'attempts'      => $a->testAttempts->count(),
-                'best_score'    => $a->testAttempts->max('score_percentage'),
+                'id'           => $a->id,
+                'document'     => $a->document->title,
+                'type'         => $a->training_type,
+                'status'       => $a->status,
+                'due_date'     => $a->due_date?->format('d.m.Y'),
+                'completed_at' => $a->completed_at?->format('d.m.Y'),
+                'best_score'   => $a->testAttempts->max('score_percentage'),
+                'attempts'     => $a->testAttempts->map(fn($att) => [
+                    'id'             => $att->id,
+                    'attempt_number' => $att->attempt_number,
+                    'score'          => $att->score_percentage,
+                    'passed'         => $att->is_passed,
+                    'finished_at'    => $att->finished_at?->format('d.m.Y H:i'),
+                    'answers'        => $att->attemptAnswers->map(fn($aa) => [
+                        'question'   => $aa->question?->question_text,
+                        'chosen'     => $aa->answer?->answer_text,
+                        'is_correct' => $aa->is_correct,
+                    ]),
+                ])->sortBy('attempt_number')->values(),
             ]);
 
         return Inertia::render('Admin/Users/Show', [

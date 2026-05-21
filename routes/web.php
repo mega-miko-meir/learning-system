@@ -44,6 +44,7 @@ Route::middleware(['auth', 'user.active'])->group(function () {
         Route::get('/', [\App\Http\Controllers\Manager\DashboardController::class, 'index'])->name('dashboard');
         Route::get('/employees', [\App\Http\Controllers\Manager\EmployeeController::class, 'index'])->name('employees');
         Route::get('/employees/{user}', [\App\Http\Controllers\Manager\EmployeeController::class, 'show'])->name('employees.show');
+        Route::get('/employees/{user}/pdf', [\App\Http\Controllers\Manager\EmployeeController::class, 'pdf'])->name('employees.pdf');
         Route::get('/reports', [\App\Http\Controllers\Manager\ReportController::class, 'index'])->name('reports');
     });
 

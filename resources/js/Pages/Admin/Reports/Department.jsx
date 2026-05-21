@@ -55,7 +55,7 @@ export default function DepartmentReport({ department, employees }) {
                                 </td>
                                 <td className="px-4 py-3 text-right">
                                     <Link
-                                        href={route("admin.reports.employee", emp.id)}
+                                        href={route("admin.users.show", emp.id)}
                                         className="text-xs text-blue-600 hover:underline"
                                     >
                                         Детали

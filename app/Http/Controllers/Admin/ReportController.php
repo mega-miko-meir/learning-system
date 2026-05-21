@@ -9,6 +9,7 @@ use App\Models\TrainingAssignment;
 use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -48,48 +49,7 @@ class ReportController extends Controller
 
     public function employee(User $user)
     {
-        $user->load(['department', 'position']);
-
-        $assignments = TrainingAssignment::with([
-                'document',
-                'testAttempts.attemptAnswers.question',
-                'testAttempts.attemptAnswers.answer',
-            ])
-            ->where('user_id', $user->id)
-            ->latest()
-            ->get()
-            ->map(fn($a) => [
-                'id'           => $a->id,
-                'document'     => $a->document->title,
-                'type'         => $a->training_type,
-                'status'       => $a->status,
-                'due_date'     => $a->due_date?->format('d.m.Y'),
-                'completed_at' => $a->completed_at?->format('d.m.Y'),
-                'best_score'   => $a->testAttempts->max('score_percentage'),
-                'attempts'     => $a->testAttempts->map(fn($att) => [
-                    'id'             => $att->id,
-                    'attempt_number' => $att->attempt_number,
-                    'score'          => $att->score_percentage,
-                    'passed'         => $att->is_passed,
-                    'finished_at'    => $att->finished_at?->format('d.m.Y H:i'),
-                    'answers'        => $att->attemptAnswers->map(fn($aa) => [
-                        'question'   => $aa->question?->question_text,
-                        'chosen'     => $aa->answer?->answer_text,
-                        'is_correct' => $aa->is_correct,
-                    ]),
-                ])->sortBy('attempt_number')->values(),
-            ]);
-
-        return Inertia::render('Admin/Reports/Employee', [
-            'employee' => [
-                'id'         => $user->id,
-                'full_name'  => $user->full_name,
-                'department' => $user->department?->name,
-                'position'   => $user->position?->name,
-                'hired_at'   => $user->hired_at?->format('d.m.Y'),
-            ],
-            'assignments' => $assignments,
-        ]);
+        return redirect()->route('admin.users.show', $user);
     }
 
     public function department(Department $department)
