@@ -62,6 +62,48 @@ class TestController extends Controller
             ->whereNotNull('finished_at')
             ->count();
 
+        // Рассчитываем оставшееся время на сервере по started_at попытки
+        $timeRemaining = null;
+        if ($test->time_limit_minutes) {
+            $elapsed       = (int) now()->diffInSeconds($attempt->started_at);
+            $timeRemaining = max(0, $test->time_limit_minutes * 60 - $elapsed);
+        }
+
+        // Если время истекло пока сотрудник не был на странице — закрываем попытку на сервере
+        if ($timeRemaining === 0) {
+            $total = $test->questions()->where('is_active', true)->count();
+            $attempt->update([
+                'finished_at'      => now(),
+                'score_percentage'  => 0,
+                'correct_answers'   => 0,
+                'total_questions'   => $total,
+                'is_passed'         => false,
+            ]);
+
+            $failedNow = TestAttempt::where('assignment_id', $assignment->id)
+                ->whereNotNull('finished_at')
+                ->where('is_passed', false)
+                ->count();
+
+            $blocked = $failedNow >= $test->max_attempts;
+            if ($blocked) {
+                $attempt->update(['is_blocked' => true]);
+            }
+
+            $assignment->update(['status' => $blocked ? 'failed' : 'in_progress']);
+
+            if ($blocked) {
+                try {
+                    $this->notifyBlocked($assignment);
+                } catch (\Exception $e) {
+                    Log::error('TestBlocked email failed: ' . $e->getMessage());
+                }
+            }
+
+            return redirect()->route('employee.assignments.show', $assignment)
+                ->with('info', 'Время теста истекло. Попытка засчитана с результатом 0%.');
+        }
+
         return Inertia::render('Employee/Test/Show', [
             'assignment' => [
                 'id'            => $assignment->id,
@@ -69,7 +111,8 @@ class TestController extends Controller
                 'attempt_count' => $finishedCount,
                 'max_attempts'  => $test->max_attempts,
             ],
-            'attempt_id' => $attempt->id,
+            'attempt_id'     => $attempt->id,
+            'time_remaining' => $timeRemaining,
             'test' => [
                 'id'              => $test->id,
                 'title'           => $test->title,
@@ -150,7 +193,10 @@ class TestController extends Controller
         abort_if($attempt->assignment_id !== $assignment->id, 403);
         abort_if($attempt->finished_at !== null, 422); // уже сдана
 
-        $test  = $assignment->document->test->load('questions.answers');
+        $test  = $assignment->document->test->load([
+            'questions' => fn($q) => $q->where('is_active', true),
+            'questions.answers',
+        ]);
         $total = $test->questions->count();
         $correct = 0;
 

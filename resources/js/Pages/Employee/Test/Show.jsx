@@ -2,26 +2,41 @@ import { Head, Link, router } from "@inertiajs/react";
 import { useEffect, useRef, useState } from "react";
 import AppLayout from "../../../Layouts/AppLayout";
 
-export default function TestShow({ assignment, test, attempt_id }) {
-    const [answers, setAnswers]         = useState({});
-    const [attemptId, setAttemptId]     = useState(attempt_id); // сразу готов — без ожидания API
+export default function TestShow({ assignment, test, attempt_id, time_remaining }) {
+    const [answers, setAnswers]             = useState({});
+    const [attemptId, setAttemptId]         = useState(attempt_id);
     const [attemptNumber, setAttemptNumber] = useState(assignment.attempt_count + 1);
-    const [result, setResult]           = useState(null);
-    const [submitting, setSubmitting] = useState(false);
-    const [timeLeft, setTimeLeft]     = useState(
-        test.time_limit ? test.time_limit * 60 : null
+    const [result, setResult]               = useState(null);
+    const [submitting, setSubmitting]       = useState(false);
+    // time_remaining от сервера — авторитетный источник (учитывает started_at)
+    const [timeLeft, setTimeLeft] = useState(
+        test.time_limit ? (time_remaining ?? test.time_limit * 60) : null
     );
     const timerRef = useRef(null);
+
+    // Keepalive — не даём сессии протухнуть во время теста (баг 419)
+    useEffect(() => {
+        const ping = setInterval(() => {
+            window.axios.get(route("employee.assignments.show", assignment.id)).catch(() => {});
+        }, 60_000);
+        return () => clearInterval(ping);
+    }, []);
 
     // Запускаем таймер когда есть attemptId (т.е. сразу при загрузке)
     useEffect(() => {
         if (timeLeft === null || !attemptId) return;
 
+        // Время уже истекло пока страница грузилась — сразу сдаём
+        if (timeLeft === 0) {
+            handleSubmit(true);
+            return;
+        }
+
         timerRef.current = setInterval(() => {
             setTimeLeft((prev) => {
                 if (prev <= 1) {
                     clearInterval(timerRef.current);
-                    handleSubmit();
+                    handleSubmit(true);
                     return 0;
                 }
                 return prev - 1;
@@ -44,19 +59,21 @@ export default function TestShow({ assignment, test, attempt_id }) {
         );
     }
 
-    async function handleSubmit() {
+    async function handleSubmit(silent = false) {
         if (submitting || !attemptId) return;
 
-        // Предупреждение если не все вопросы отвечены
-        const unanswered = test.questions.filter((q) => {
-            const a = answers[q.id];
-            return a === undefined || a === null || (Array.isArray(a) && a.length === 0);
-        });
-        if (unanswered.length > 0) {
-            const ok = window.confirm(
-                `Вы не ответили на ${unanswered.length} из ${test.questions.length} вопросов.\nСдать тест с пропущенными ответами?`
-            );
-            if (!ok) return;
+        // Предупреждение если не все вопросы отвечены (не показываем при таймауте)
+        if (!silent) {
+            const unanswered = test.questions.filter((q) => {
+                const a = answers[q.id];
+                return a === undefined || a === null || (Array.isArray(a) && a.length === 0);
+            });
+            if (unanswered.length > 0) {
+                const ok = window.confirm(
+                    `Вы не ответили на ${unanswered.length} из ${test.questions.length} вопросов.\nСдать тест с пропущенными ответами?`
+                );
+                if (!ok) return;
+            }
         }
 
         setSubmitting(true);

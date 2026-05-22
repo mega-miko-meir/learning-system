@@ -98,7 +98,7 @@ class MatrixController extends Controller
             foreach ($users as $user) {
                 $exists = TrainingAssignment::where('user_id', $user->id)
                     ->where('document_id', $item->document_id)
-                    ->whereNotIn('status', ['completed', 'failed', 'expired'])
+                    ->whereNotIn('status', ['expired'])
                     ->exists();
 
                 if (!$exists) {

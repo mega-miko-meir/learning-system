@@ -36,6 +36,10 @@ class AssignmentController extends Controller
 
         $assignment->load('document.test');
 
+        $requiredSeconds = ($assignment->required_reading_minutes ?? 10) * 60;
+        $spentSeconds    = $assignment->time_spent_seconds ?? 0;
+        $isUnlocked      = $spentSeconds >= $requiredSeconds;
+
         return Inertia::render('Employee/Assignments/Show', [
             'assignment' => [
                 'id'                 => $assignment->id,
@@ -49,10 +53,12 @@ class AssignmentController extends Controller
                 'status'             => $assignment->status,
                 'due_date'           => $assignment->due_date?->format('d.m.Y'),
                 'started_at'         => $assignment->started_at?->format('d.m.Y H:i'),
-                'time_spent_seconds'  => $assignment->time_spent_seconds ?? 0,
-                'required_seconds'    => ($assignment->required_reading_minutes ?? 10) * 60,
+                'time_spent_seconds'  => $spentSeconds,
+                'required_seconds'    => $requiredSeconds,
+                'is_unlocked'         => $isUnlocked,
                 'has_test'            => $assignment->document->test !== null,
-                'view_url'            => in_array($assignment->status, ['pending', 'in_progress'])
+                // view_url только пока не истекло время чтения — сервер не даёт URL после разблокировки
+                'view_url'            => (!$isUnlocked && in_array($assignment->status, ['pending', 'in_progress']))
                     ? route('documents.view', $assignment->document)
                     : null,
             ],

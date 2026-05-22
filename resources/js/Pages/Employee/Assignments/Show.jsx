@@ -22,6 +22,7 @@ export default function AssignmentShow({ assignment }) {
         status,
         time_spent_seconds,
         required_seconds,
+        is_unlocked: serverUnlocked,
         has_test,
         view_url,
     } = assignment;
@@ -38,7 +39,7 @@ export default function AssignmentShow({ assignment }) {
     const isReadonly        = ["completed", "failed", "expired"].includes(status);
 
     const remaining = Math.max(0, required_seconds - spent);
-    const unlocked  = remaining === 0;
+    const unlocked  = serverUnlocked || remaining === 0;
     const progress  = required_seconds > 0 ? Math.round(spent / required_seconds * 100) : 100;
 
     // Если администратор сбросил назначение и Inertia обновила пропсы без ремонта —

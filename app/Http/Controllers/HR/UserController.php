@@ -257,7 +257,7 @@ class UserController extends Controller
         foreach ($matrixItems as $item) {
             $exists = TrainingAssignment::where('user_id', $user->id)
                 ->where('document_id', $item->document_id)
-                ->whereNotIn('status', ['completed', 'failed', 'expired'])
+                ->whereNotIn('status', ['expired'])
                 ->exists();
 
             if (!$exists) {
