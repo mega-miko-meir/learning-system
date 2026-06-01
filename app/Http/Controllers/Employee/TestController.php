@@ -271,8 +271,8 @@ class TestController extends Controller
             Mail::to($manager->email)->queue(new TestBlocked($assignment, 'manager'));
         }
 
-        // Всем администраторам (admin и superadmin) у кого есть email
-        User::whereIn('role', ['admin', 'superadmin'])
+        // Всем администраторам (admin) у кого есть email
+        User::whereIn('role', ['admin'])
             ->whereNotNull('email')
             ->where('is_active', true)
             ->get()
