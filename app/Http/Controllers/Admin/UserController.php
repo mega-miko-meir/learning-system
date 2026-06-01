@@ -136,11 +136,14 @@ class UserController extends Controller
                     'score'          => $att->score_percentage,
                     'passed'         => $att->is_passed,
                     'finished_at'    => $att->finished_at?->format('d.m.Y H:i'),
-                    'answers'        => $att->attemptAnswers->map(fn($aa) => [
-                        'question'   => $aa->question?->question_text,
-                        'chosen'     => $aa->answer?->answer_text,
-                        'is_correct' => $aa->is_correct,
-                    ]),
+                    'answers'        => $att->attemptAnswers
+                        ->groupBy('question_id')
+                        ->map(fn($group) => [
+                            'question'   => $group->first()->question?->question_text,
+                            'chosen'     => $group->map(fn($aa) => $aa->answer?->answer_text)->filter()->implode(', '),
+                            'is_correct' => (bool) $group->first()->is_correct,
+                        ])
+                        ->values(),
                 ])->sortBy('attempt_number')->values(),
             ]);
 

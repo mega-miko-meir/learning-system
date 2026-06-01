@@ -197,23 +197,45 @@ class TestController extends Controller
             'questions' => fn($q) => $q->where('is_active', true),
             'questions.answers',
         ]);
-        $total = $test->questions->count();
+        $total   = $test->questions->count();
         $correct = 0;
 
         foreach ($test->questions as $question) {
-            $givenId       = $request->answers[$question->id] ?? null;
-            $correctAnswer = $question->answers->firstWhere('is_correct', true);
-            $isCorrect     = $givenId && $correctAnswer && (int) $givenId === $correctAnswer->id;
+            $given = $request->answers[$question->id] ?? null;
 
-            if ($isCorrect) $correct++;
+            if ($question->question_type === 'multiple') {
+                $givenIds   = is_array($given) ? array_map('intval', $given) : [];
+                $correctIds = $question->answers->where('is_correct', true)->pluck('id')->toArray();
 
-            if ($givenId) {
-                AttemptAnswer::create([
-                    'attempt_id'  => $attempt->id,
-                    'question_id' => $question->id,
-                    'answer_id'   => (int) $givenId,
-                    'is_correct'  => $isCorrect,
-                ]);
+                $isCorrect = !empty($givenIds)
+                    && empty(array_diff($givenIds, $correctIds))
+                    && empty(array_diff($correctIds, $givenIds));
+
+                if ($isCorrect) $correct++;
+
+                foreach ($givenIds as $answerId) {
+                    AttemptAnswer::create([
+                        'attempt_id'  => $attempt->id,
+                        'question_id' => $question->id,
+                        'answer_id'   => $answerId,
+                        'is_correct'  => $isCorrect, // результат всего вопроса, не отдельного ответа
+                    ]);
+                }
+            } else {
+                $givenId       = $given ? (int) $given : null;
+                $correctAnswer = $question->answers->firstWhere('is_correct', true);
+                $isCorrect     = $givenId && $correctAnswer && $givenId === $correctAnswer->id;
+
+                if ($isCorrect) $correct++;
+
+                if ($givenId) {
+                    AttemptAnswer::create([
+                        'attempt_id'  => $attempt->id,
+                        'question_id' => $question->id,
+                        'answer_id'   => $givenId,
+                        'is_correct'  => $isCorrect,
+                    ]);
+                }
             }
         }
 

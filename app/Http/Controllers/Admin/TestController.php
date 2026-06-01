@@ -9,6 +9,7 @@ use App\Models\Document;
 use App\Models\Question;
 use App\Models\Test;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class TestController extends Controller
@@ -62,6 +63,16 @@ class TestController extends Controller
             'questions.*.answers.*.text'       => ['required', 'string', 'max:500'],
             'questions.*.answers.*.is_correct' => ['boolean'],
         ]);
+
+        if ($request->document_id) {
+            $existing = Test::where('document_id', $request->document_id)->first();
+            if ($existing) {
+                if (!$request->boolean('force_replace')) {
+                    return back()->withErrors(['document_conflict' => $existing->title])->withInput();
+                }
+                $existing->update(['document_id' => null]);
+            }
+        }
 
         $test = Test::create([
             'title'              => $request->title,
@@ -141,6 +152,16 @@ class TestController extends Controller
             'questions.*.answers.*.is_correct' => ['boolean'],
         ]);
 
+        if ($request->document_id) {
+            $existing = Test::where('document_id', $request->document_id)->where('id', '!=', $test->id)->first();
+            if ($existing) {
+                if (!$request->boolean('force_replace')) {
+                    return back()->withErrors(['document_conflict' => $existing->title])->withInput();
+                }
+                $existing->update(['document_id' => null]);
+            }
+        }
+
         $test->update([
             'title'              => $request->title,
             'document_id'        => $request->document_id,
@@ -187,6 +208,106 @@ class TestController extends Controller
 
         return redirect()->route('admin.tests.index')
             ->with('success', "Тест «{$title}» удалён.");
+    }
+
+    public function parsePdf(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:pdf', 'max:10240'],
+        ]);
+
+        try {
+            $parser = new \Smalot\PdfParser\Parser();
+            $pdf    = $parser->parseFile($request->file('file')->getPathname());
+            $text   = str_replace(["\r\n", "\r"], "\n", $pdf->getText());
+
+            $lines     = array_values(array_filter(array_map('trim', explode("\n", $text))));
+            $title     = '';
+            $bodyStart = 0;
+
+            if (!empty($lines) && !preg_match('/^\d+\./', $lines[0])) {
+                $title     = $lines[0];
+                $bodyStart = 1;
+            }
+
+            $body      = implode("\n", array_slice($lines, $bodyStart));
+            $questions = $this->parsePdfText($body);
+
+            if (empty($questions)) {
+                return response()->json([
+                    'error' => 'Вопросы не найдены. Убедитесь что файл соответствует шаблону.',
+                ], 422);
+            }
+
+            return response()->json(['title' => $title, 'questions' => $questions]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Не удалось прочитать PDF: ' . $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    private function parsePdfText(string $text): array
+    {
+        $blocks = preg_split('/(?=^\d+\.)/m', $text);
+
+        $questions = [];
+
+        foreach ($blocks as $block) {
+            $block = trim($block);
+            if (empty($block) || !preg_match('/^\d+\./', $block)) {
+                continue;
+            }
+
+            $lines = array_values(array_filter(
+                array_map('trim', explode("\n", $block)),
+                fn($l) => $l !== ''
+            ));
+
+            if (empty($lines)) continue;
+
+            $questionLine = preg_replace('/^\d+\.\s*/', '', $lines[0]);
+
+            $type = 'single';
+            if (preg_match('/\[multiple\]/i', $questionLine)) {
+                $type         = 'multiple';
+                $questionLine = trim(preg_replace('/\[multiple\]/i', '', $questionLine));
+            }
+
+            $questionText = trim($questionLine);
+            if (empty($questionText)) continue;
+
+            $answers = [];
+            for ($i = 1; $i < count($lines); $i++) {
+                $line = $lines[$i];
+                if (!preg_match('/^[a-zа-яёA-ZА-ЯЁ]\)\s*(.*)/u', $line, $match)) {
+                    continue;
+                }
+
+                $answerText = trim($match[1]);
+                $isCorrect  = false;
+
+                if (str_ends_with($answerText, '*')) {
+                    $isCorrect  = true;
+                    $answerText = trim(rtrim($answerText, '* '));
+                }
+
+                if ($answerText !== '') {
+                    $answers[] = ['text' => $answerText, 'is_correct' => $isCorrect];
+                }
+            }
+
+            if (count($answers) >= 2) {
+                $questions[] = [
+                    'text'    => $questionText,
+                    'type'    => $type,
+                    'answers' => $answers,
+                ];
+            }
+        }
+
+        return $questions;
     }
 
     private function syncQuestions(Test $test, array $questions): void

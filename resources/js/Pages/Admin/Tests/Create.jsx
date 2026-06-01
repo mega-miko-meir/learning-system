@@ -1,5 +1,5 @@
 import { Head, Link, router } from "@inertiajs/react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import AppLayout from "../../../Layouts/AppLayout";
 
 let _id = 0;
@@ -62,8 +62,8 @@ function QuestionCard({ q, index, onChange, onRemove, hasError }) {
         <div className={`bg-white rounded-xl border overflow-hidden ${hasError && !hasCorrect ? "border-red-300" : "border-gray-200"}`}>
             {/* Шапка вопроса */}
             <div className="flex items-center gap-3 px-5 pt-4 pb-3 border-b border-gray-100">
-                <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold shrink-0">
-                    {index + 1}
+                <span className="text-sm font-bold text-gray-400 shrink-0 w-6 text-right">
+                    {index + 1}.
                 </span>
                 <textarea
                     value={q.text}
@@ -176,9 +176,13 @@ export default function TestCreate({ documents, document_id, test }) {
     const [maxAttempts, setMaxAttempts]   = useState(test?.max_attempts ?? 3);
     const [isActive, setIsActive]         = useState(test?.is_active ?? true);
     const [questions, setQuestions]       = useState(isEdit ? initFromTest(test) : [mkQuestion()]);
-    const [submitting, setSubmitting]     = useState(false);
-    const [errors, setErrors]             = useState({});
-    const [validated, setValidated]       = useState(false);
+    const [submitting, setSubmitting]       = useState(false);
+    const [errors, setErrors]               = useState({});
+    const [validated, setValidated]         = useState(false);
+    const [importing, setImporting]         = useState(false);
+    const [importError, setImportError]     = useState(null);
+    const [replaceConfirm, setReplaceConfirm] = useState(null); // { testTitle }
+    const fileInputRef                      = useRef(null);
 
     function updateQuestion(id, updated) {
         setQuestions((qs) => qs.map((q) => q._id === id ? updated : q));
@@ -192,6 +196,48 @@ export default function TestCreate({ documents, document_id, test }) {
         setQuestions((qs) => [...qs, mkQuestion()]);
     }
 
+    async function handleImport(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        e.target.value = '';
+
+        const hasQuestions = questions.some(q => q.text.trim());
+        if (hasQuestions && !confirm('Импортированные вопросы заменят текущие. Продолжить?')) return;
+
+        setImporting(true);
+        setImportError(null);
+
+        const formData = new FormData();
+        formData.append('file', file);
+        const token = document.querySelector('meta[name="csrf-token"]')?.content;
+
+        try {
+            const res  = await fetch(route('admin.tests.parse-pdf'), {
+                method:  'POST',
+                headers: { 'X-CSRF-TOKEN': token, 'Accept': 'application/json' },
+                body:    formData,
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+                setImportError(data.error ?? 'Ошибка при разборе файла.');
+                return;
+            }
+
+            if (data.title) setTitle(data.title);
+            setQuestions(data.questions.map(q => ({
+                _id:     uid(),
+                text:    q.text,
+                type:    q.type,
+                answers: q.answers.map(a => ({ _id: uid(), text: a.text, is_correct: a.is_correct })),
+            })));
+        } catch {
+            setImportError('Не удалось загрузить файл. Проверьте соединение.');
+        } finally {
+            setImporting(false);
+        }
+    }
+
     function validate() {
         for (let i = 0; i < questions.length; i++) {
             const q = questions[i];
@@ -203,26 +249,15 @@ export default function TestCreate({ documents, document_id, test }) {
         return null;
     }
 
-    function submit(e) {
-        e.preventDefault();
-        setValidated(true);
-
-        const err = validate();
-        if (err) {
-            alert(err);
-            return;
-        }
-
-        setSubmitting(true);
-        setErrors({});
-
-        const payload = {
+    function buildPayload(forceReplace = false) {
+        return {
             title,
             document_id:   docId || null,
             passing_score: passingScore,
             time_limit:    timeLimit || null,
             max_attempts:  maxAttempts,
             is_active:     isActive,
+            force_replace: forceReplace,
             questions:     questions.map((q, qi) => ({
                 text:    q.text,
                 type:    q.type,
@@ -236,18 +271,46 @@ export default function TestCreate({ documents, document_id, test }) {
                     })),
             })),
         };
+    }
 
+    function handleErrors(e) {
+        if (e.document_conflict) {
+            setReplaceConfirm({ testTitle: e.document_conflict });
+            setSubmitting(false);
+            return;
+        }
+        setErrors(e);
+        setSubmitting(false);
+    }
+
+    function submitPayload(forceReplace = false) {
+        setSubmitting(true);
+        setErrors({});
+        const payload = buildPayload(forceReplace);
         if (isEdit) {
             router.put(route("admin.tests.update", test.id), payload, {
-                onError:  (e) => { setErrors(e); setSubmitting(false); },
-                onFinish: ()  => setSubmitting(false),
+                onError:  handleErrors,
+                onFinish: () => setSubmitting(false),
             });
         } else {
             router.post(route("admin.tests.store"), payload, {
-                onError:  (e) => { setErrors(e); setSubmitting(false); },
-                onFinish: ()  => setSubmitting(false),
+                onError:  handleErrors,
+                onFinish: () => setSubmitting(false),
             });
         }
+    }
+
+    function submit(e) {
+        e.preventDefault();
+        setValidated(true);
+        const err = validate();
+        if (err) { alert(err); return; }
+        submitPayload(false);
+    }
+
+    function confirmReplace() {
+        setReplaceConfirm(null);
+        submitPayload(true);
     }
 
     return (
@@ -352,6 +415,68 @@ export default function TestCreate({ documents, document_id, test }) {
 
                 {/* ── Вопросы ── */}
                 <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-semibold text-gray-700">
+                            Вопросы <span className="text-gray-400 font-normal">({questions.length})</span>
+                        </h3>
+                        <div className="flex items-center gap-2">
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept=".pdf"
+                                className="hidden"
+                                onChange={handleImport}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => fileInputRef.current.click()}
+                                disabled={importing}
+                                title="Импортировать вопросы из PDF-файла"
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 disabled:opacity-50 transition-colors"
+                            >
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                </svg>
+                                {importing ? 'Загрузка...' : 'Импорт из PDF'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {importError && (
+                        <div className="flex items-start gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+                            <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                            </svg>
+                            <span>{importError}</span>
+                        </div>
+                    )}
+
+                    <details className="group">
+                        <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600 select-none list-none flex items-center gap-1">
+                            <svg className="w-3 h-3 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                            </svg>
+                            Формат PDF-шаблона
+                        </summary>
+                        <pre className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600 overflow-x-auto leading-relaxed">{`Название теста
+
+1. Текст вопроса с одним ответом?
+a) Вариант А
+b) Вариант Б *
+c) Вариант В
+
+2. Вопрос с несколькими ответами? [multiple]
+a) Вариант А *
+b) Вариант Б *
+c) Вариант В
+d) Вариант Г`}</pre>
+                        <p className="mt-1.5 text-xs text-gray-400">
+                            Первая строка → название теста &nbsp;·&nbsp;
+                            <span className="font-medium text-gray-500">*</span> — правильный ответ &nbsp;·&nbsp;
+                            <span className="font-medium text-gray-500">[multiple]</span> — несколько правильных ответов
+                        </p>
+                    </details>
+
                     {questions.map((q, i) => (
                         <QuestionCard
                             key={q._id}
@@ -392,6 +517,44 @@ export default function TestCreate({ documents, document_id, test }) {
                     </Link>
                 </div>
             </form>
+            {replaceConfirm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6">
+                        <div className="flex items-start gap-3 mb-4">
+                            <div className="shrink-0 w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                                <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-semibold text-gray-900 mb-1">Документ уже имеет тест</h3>
+                                <p className="text-sm text-gray-600">
+                                    К этому документу уже прикреплён тест{' '}
+                                    <span className="font-medium text-gray-800">«{replaceConfirm.testTitle}»</span>.
+                                    Хотите открепить его и прикрепить текущий?
+                                </p>
+                                <p className="mt-1.5 text-xs text-gray-400">Старый тест не удалится — он просто останется без документа.</p>
+                            </div>
+                        </div>
+                        <div className="flex gap-2 justify-end">
+                            <button
+                                type="button"
+                                onClick={() => setReplaceConfirm(null)}
+                                className="px-4 py-2 text-sm border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50"
+                            >
+                                Отмена
+                            </button>
+                            <button
+                                type="button"
+                                onClick={confirmReplace}
+                                className="px-4 py-2 text-sm bg-amber-500 text-white font-medium rounded-xl hover:bg-amber-600"
+                            >
+                                Заменить
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </AppLayout>
     );
 }

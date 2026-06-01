@@ -84,6 +84,7 @@ Route::middleware(['auth', 'user.active'])->group(function () {
         Route::post('/matrix/apply-all', [\App\Http\Controllers\Admin\MatrixController::class, 'applyToAll'])->name('matrix.apply-all');
 
         // Тесты
+        Route::post('/tests/parse-pdf', [\App\Http\Controllers\Admin\TestController::class, 'parsePdf'])->name('tests.parse-pdf');
         Route::resource('tests', \App\Http\Controllers\Admin\TestController::class);
         Route::delete('/tests/{test}/force', [\App\Http\Controllers\Admin\TestController::class, 'forceDestroy'])->name('tests.force-delete');
         Route::resource('tests.questions', \App\Http\Controllers\Admin\QuestionController::class)->shallow();
