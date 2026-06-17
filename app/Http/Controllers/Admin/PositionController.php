@@ -15,15 +15,18 @@ class PositionController extends Controller
     {
         $positions = Position::with('department')
             ->orderBy('name')
-            ->paginate(20)
-            ->through(fn($p) => [
-                'id'         => $p->id,
-                'name'       => $p->name,
-                'department' => $p->department?->name,
-                'is_active'  => $p->is_active,
+            ->get()
+            ->map(fn($p) => [
+                'id'            => $p->id,
+                'name'          => $p->name,
+                'department'    => $p->department?->name,
+                'department_id' => $p->department_id,
+                'is_active'     => $p->is_active,
             ]);
 
-        return Inertia::render('Admin/Positions/Index', compact('positions'));
+        $departments = Department::active()->orderBy('name')->get(['id', 'name']);
+
+        return Inertia::render('Admin/Positions/Index', compact('positions', 'departments'));
     }
 
     public function create()

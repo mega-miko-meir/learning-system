@@ -67,11 +67,15 @@ class UserController extends Controller
             'last_name'     => ['required', 'string', 'max:100'],
             'first_name'    => ['required', 'string', 'max:100'],
             'middle_name'   => ['nullable', 'string', 'max:100'],
-            'phone'         => ['required', 'string', 'max:20', 'unique:users,phone'],
+            'phone'         => ['nullable', 'string', 'max:20', 'unique:users,phone', 'required_without:email'],
+            'email'         => ['nullable', 'email', 'unique:users,email', 'required_without:phone'],
             'department_id' => ['nullable', 'exists:departments,id'],
             'position_id'   => ['nullable', 'exists:positions,id'],
             'manager_id'    => ['nullable', 'exists:users,id'],
             'hired_at'      => ['nullable', 'date'],
+        ], [
+            'phone.required_without' => 'Укажите телефон или email.',
+            'email.required_without' => 'Укажите email или телефон.',
         ]);
 
         $tempPassword = 'Temp' . rand(1000, 9999) . '!';
@@ -84,6 +88,10 @@ class UserController extends Controller
             'must_change_password' => $mustChange,
             'is_active'            => true,
         ]);
+
+        if ($user->position_id) {
+            $this->assignTrainingByPosition($user);
+        }
 
         AuditLog::create([
             'user_id'     => auth()->id(),
@@ -258,16 +266,25 @@ class UserController extends Controller
             'last_name'     => ['required', 'string', 'max:100'],
             'first_name'    => ['required', 'string', 'max:100'],
             'middle_name'   => ['nullable', 'string', 'max:100'],
-            'phone'         => ['nullable', 'string', 'max:20', Rule::unique('users', 'phone')->ignore($user->id)],
+            'phone'         => ['nullable', 'string', 'max:20', Rule::unique('users', 'phone')->ignore($user->id), 'required_without:email'],
+            'email'         => ['nullable', 'email', Rule::unique('users', 'email')->ignore($user->id), 'required_without:phone'],
             'department_id' => ['nullable', 'exists:departments,id'],
             'position_id'   => ['nullable', 'exists:positions,id'],
             'manager_id'    => ['nullable', 'exists:users,id'],
             'hired_at'      => ['nullable', 'date'],
+        ], [
+            'phone.required_without' => 'Укажите телефон или email.',
+            'email.required_without' => 'Укажите email или телефон.',
         ]);
 
-        $oldValues = $user->only(array_keys($data));
+        $oldPositionId = $user->position_id;
+        $oldValues     = $user->only(array_keys($data));
 
         $user->update($data);
+
+        if (isset($data['position_id']) && (string) $data['position_id'] !== (string) $oldPositionId && $user->position_id) {
+            $this->assignTrainingByPosition($user->fresh());
+        }
 
         AuditLog::create([
             'user_id'     => auth()->id(),
@@ -362,5 +379,36 @@ class UserController extends Controller
             ->whereIn('id', TrainingMatrix::active()->where('position_id', $user->position_id)->pluck('document_id'))
             ->orderBy('description')
             ->get(['id', 'title', 'description']);
+    }
+
+    private function assignTrainingByPosition(User $user): int
+    {
+        $matrixItems = TrainingMatrix::active()
+            ->where('position_id', $user->position_id)
+            ->get();
+
+        $created = 0;
+
+        foreach ($matrixItems as $item) {
+            $exists = TrainingAssignment::where('user_id', $user->id)
+                ->where('document_id', $item->document_id)
+                ->whereNotIn('status', ['expired'])
+                ->exists();
+
+            if (!$exists) {
+                TrainingAssignment::create([
+                    'user_id'                  => $user->id,
+                    'document_id'              => $item->document_id,
+                    'matrix_id'                => $item->id,
+                    'training_type'            => $item->training_type,
+                    'status'                   => 'pending',
+                    'due_date'                 => now()->addDays(30),
+                    'required_reading_minutes' => $item->required_reading_minutes,
+                ]);
+                $created++;
+            }
+        }
+
+        return $created;
     }
 }

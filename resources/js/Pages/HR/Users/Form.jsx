@@ -9,6 +9,7 @@ export default function HRUserForm({ user, departments, managers }) {
         first_name:           user?.first_name    ?? "",
         middle_name:          user?.middle_name   ?? "",
         phone:                user?.phone         ?? "",
+        email:                user?.email         ?? "",
         department_id:        user?.department_id ?? "",
         position_id:          user?.position_id   ?? "",
         manager_id:           user?.manager_id    ?? "",
@@ -60,14 +61,25 @@ export default function HRUserForm({ user, departments, managers }) {
                         ))}
                     </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                            Телефон * <span className="text-gray-400 font-normal text-xs">(используется для входа)</span>
-                        </label>
-                        <input value={data.phone} onChange={(e) => setData("phone", e.target.value)}
-                            placeholder="+77001234567"
-                            className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.phone ? "border-red-300" : "border-gray-200"}`} />
-                        {errors.phone && <p className="mt-1 text-xs text-red-600">{errors.phone}</p>}
+                    <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                        Укажите телефон <strong>или</strong> email — хотя бы одно обязательно. Это будет использоваться для входа в систему.
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Телефон *</label>
+                            <input value={data.phone} onChange={(e) => setData("phone", e.target.value)}
+                                placeholder="+77001234567"
+                                className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.phone ? "border-red-300" : "border-gray-200"}`} />
+                            {errors.phone && <p className="mt-1 text-xs text-red-600">{errors.phone}</p>}
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Email *</label>
+                            <input type="email" value={data.email} onChange={(e) => setData("email", e.target.value)}
+                                placeholder="example@company.com"
+                                className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.email ? "border-red-300" : "border-gray-200"}`} />
+                            {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email}</p>}
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">

@@ -1,19 +1,31 @@
-import { Head, useForm, router } from "@inertiajs/react";
-import { useState } from "react";
+import { Head, router } from "@inertiajs/react";
+import { useState, useMemo } from "react";
 import AppLayout from "../../../Layouts/AppLayout";
 
+const TRAINING_TYPES = [
+    { value: "primary",   label: "Первичное" },
+    { value: "periodic",  label: "Периодическое" },
+    { value: "unplanned", label: "Внеплановое" },
+    { value: "special",   label: "Специальное" },
+];
+
 function EditModal({ item, onClose }) {
-    const { data, setData, patch, processing, errors } = useForm({
+    const [form, setForm]     = useState({
         training_type:            item.training_type,
         is_mandatory:             item.is_mandatory,
         required_reading_minutes: item.required_reading_minutes,
     });
+    const [saving, setSaving] = useState(false);
+    const [errors, setErrors] = useState({});
 
     function submit(e) {
         e.preventDefault();
-        patch(route("admin.matrix.update", item.id), {
-            onSuccess: onClose,
+        setSaving(true);
+        router.patch(route("admin.matrix.update", item.id), form, {
             preserveScroll: true,
+            onSuccess: onClose,
+            onError: setErrors,
+            onFinish: () => setSaving(false),
         });
     }
 
@@ -26,44 +38,33 @@ function EditModal({ item, onClose }) {
                 <form onSubmit={submit} className="space-y-4">
                     <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Вид обучения</label>
-                        <select
-                            value={data.training_type}
-                            onChange={(e) => setData("training_type", e.target.value)}
-                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                            {TRAINING_TYPES.map((t) => (
-                                <option key={t.value} value={t.value}>{t.label}</option>
-                            ))}
+                        <select value={form.training_type}
+                            onChange={(e) => setForm({ ...form, training_type: e.target.value })}
+                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            {TRAINING_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                         </select>
                     </div>
 
                     <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Время изучения (мин) *</label>
-                        <input
-                            type="number"
-                            min="1"
-                            max="9999"
-                            value={data.required_reading_minutes}
-                            onChange={(e) => setData("required_reading_minutes", parseInt(e.target.value) || 1)}
-                            className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.required_reading_minutes ? "border-red-300" : "border-gray-200"}`}
-                        />
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Время изучения (мин)</label>
+                        <input type="number" min="1" max="9999"
+                            value={form.required_reading_minutes}
+                            onChange={(e) => setForm({ ...form, required_reading_minutes: parseInt(e.target.value) || 1 })}
+                            className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.required_reading_minutes ? "border-red-300" : "border-gray-200"}`} />
                         {errors.required_reading_minutes && <p className="mt-1 text-xs text-red-600">{errors.required_reading_minutes}</p>}
                     </div>
 
                     <label className="flex items-center gap-2 text-sm text-gray-700">
-                        <input
-                            type="checkbox"
-                            checked={data.is_mandatory}
-                            onChange={(e) => setData("is_mandatory", e.target.checked)}
-                            className="w-4 h-4 accent-blue-600"
-                        />
+                        <input type="checkbox" checked={form.is_mandatory}
+                            onChange={(e) => setForm({ ...form, is_mandatory: e.target.checked })}
+                            className="w-4 h-4 accent-blue-600" />
                         Обязательное
                     </label>
 
                     <div className="flex gap-2 pt-1">
-                        <button type="submit" disabled={processing}
+                        <button type="submit" disabled={saving}
                             className="flex-1 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50">
-                            {processing ? "Сохраняем..." : "Сохранить"}
+                            {saving ? "Сохраняем..." : "Сохранить"}
                         </button>
                         <button type="button" onClick={onClose}
                             className="flex-1 px-4 py-2 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">
@@ -81,40 +82,199 @@ function ApplyMatrixButton() {
     function apply() {
         if (!confirm("Назначить все документы из матрицы текущим активным сотрудникам? Дубли пропускаются.")) return;
         setLoading(true);
-        router.post(route("admin.matrix.apply-all"), {}, {
-            onFinish: () => setLoading(false),
-        });
+        router.post(route("admin.matrix.apply-all"), {}, { onFinish: () => setLoading(false) });
     }
     return (
         <button onClick={apply} disabled={loading}
             className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50">
-            {loading ? "Применяем..." : "⚡ Применить матрицу к сотрудникам"}
+            {loading ? "Применяем..." : "Применить матрицу к сотрудникам"}
         </button>
     );
 }
 
-const TRAINING_TYPES = [
-    { value: "primary",  label: "Первичное" },
-    { value: "periodic", label: "Периодическое" },
-    { value: "unplanned", label: "Внеплановое" },
-    { value: "special",  label: "Специальное" },
-];
+function AddForm({ positions, documents, matrix, departments }) {
+    const [departmentId,     setDepartmentId]     = useState("");
+    const [positionId,       setPositionId]       = useState("");
+    const [selectedDocIds,   setSelectedDocIds]   = useState([]);
+    const [trainingType,     setTrainingType]      = useState("primary");
+    const [readingMinutes,   setReadingMinutes]   = useState(10);
+    const [isMandatory,      setIsMandatory]      = useState(true);
+    const [docSearch,        setDocSearch]        = useState("");
+    const [saving,           setSaving]           = useState(false);
+    const [errors,           setErrors]           = useState({});
 
-export default function MatrixIndex({ matrix, positions, documents }) {
-    const [filterPos, setFilterPos]   = useState("");
-    const [editItem,  setEditItem]    = useState(null);
-    const { data, setData, post, processing, errors, reset } = useForm({
-        position_id:               "",
-        document_id:               "",
-        training_type:             "primary",
-        is_mandatory:              true,
-        required_reading_minutes:  10,
-    });
+    const filteredPositions = useMemo(() =>
+        departmentId
+            ? positions.filter((p) => p.department_id === Number(departmentId))
+            : positions,
+        [departmentId, positions]
+    );
+
+    function handleDepartmentChange(id) {
+        setDepartmentId(id);
+        setPositionId("");
+        setSelectedDocIds([]);
+        setDocSearch("");
+    }
+
+    const existingDocIds = useMemo(() => {
+        if (!positionId) return new Set();
+        return new Set(matrix.filter((m) => m.position_id === Number(positionId)).map((m) => m.document_id));
+    }, [positionId, matrix]);
+
+    const availableDocs = useMemo(() => {
+        return documents
+            .filter((d) => !existingDocIds.has(d.id))
+            .filter((d) =>
+                !docSearch.trim() ||
+                d.description.toLowerCase().includes(docSearch.toLowerCase()) ||
+                d.title.toLowerCase().includes(docSearch.toLowerCase())
+            );
+    }, [documents, existingDocIds, docSearch]);
+
+    const allSelected = availableDocs.length > 0 && availableDocs.every((d) => selectedDocIds.includes(d.id));
+
+    function toggleDoc(id) {
+        setSelectedDocIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+    }
+
+    function toggleAll() {
+        setSelectedDocIds(allSelected ? [] : availableDocs.map((d) => d.id));
+    }
+
+    function handlePositionChange(id) {
+        setPositionId(id);
+        setSelectedDocIds([]);
+        setDocSearch("");
+    }
 
     function submit(e) {
         e.preventDefault();
-        post(route("admin.matrix.store"), { onSuccess: reset });
+        setErrors({});
+        if (!positionId) { setErrors({ position_id: "Выберите должность" }); return; }
+        if (selectedDocIds.length === 0) { setErrors({ document_ids: "Выберите хотя бы один документ" }); return; }
+
+        setSaving(true);
+        router.post(route("admin.matrix.store"), {
+            position_id:              positionId,
+            document_ids:             selectedDocIds,
+            training_type:            trainingType,
+            is_mandatory:             isMandatory,
+            required_reading_minutes: readingMinutes,
+        }, {
+            preserveScroll: true,
+            onSuccess: () => { setSelectedDocIds([]); setDocSearch(""); },
+            onError: setErrors,
+            onFinish: () => setSaving(false),
+        });
     }
+
+    return (
+        <div className="bg-white rounded-xl border border-gray-100 p-5 sticky top-6">
+            <h2 className="text-sm font-semibold text-gray-700 mb-4">Добавить документы в матрицу</h2>
+
+            <form onSubmit={submit} className="space-y-4">
+                <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Отдел</label>
+                    <select value={departmentId} onChange={(e) => handleDepartmentChange(e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">— Все отделы —</option>
+                        {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                </div>
+
+                <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Должность *</label>
+                    <select value={positionId} onChange={(e) => handlePositionChange(e.target.value)}
+                        className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.position_id ? "border-red-300" : "border-gray-200"}`}>
+                        <option value="">— Выберите должность —</option>
+                        {filteredPositions.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                    {errors.position_id && <p className="mt-1 text-xs text-red-600">{errors.position_id}</p>}
+                </div>
+
+                {positionId && (
+                    <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                            <label className="text-xs font-medium text-gray-600">
+                                Документы *
+                                {selectedDocIds.length > 0 && (
+                                    <span className="ml-1.5 text-blue-600">({selectedDocIds.length} выбрано)</span>
+                                )}
+                            </label>
+                            {availableDocs.length > 0 && (
+                                <button type="button" onClick={toggleAll}
+                                    className="text-xs text-blue-500 hover:text-blue-700">
+                                    {allSelected ? "Снять все" : "Выбрать все"}
+                                </button>
+                            )}
+                        </div>
+
+                        <input type="text" value={docSearch} onChange={(e) => setDocSearch(e.target.value)}
+                            placeholder="Поиск документа..."
+                            className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+
+                        {availableDocs.length === 0 ? (
+                            <p className="text-xs text-gray-400 py-2 text-center">
+                                {docSearch ? "Ничего не найдено" : "Все документы уже добавлены для этой должности"}
+                            </p>
+                        ) : (
+                            <div className="border border-gray-200 rounded-lg overflow-hidden max-h-52 overflow-y-auto">
+                                {availableDocs.map((d) => (
+                                    <label key={d.id}
+                                        className={`flex items-start gap-2.5 px-3 py-2 cursor-pointer hover:bg-gray-50 text-sm border-b border-gray-100 last:border-0 ${selectedDocIds.includes(d.id) ? "bg-blue-50" : ""}`}>
+                                        <input type="checkbox" checked={selectedDocIds.includes(d.id)}
+                                            onChange={() => toggleDoc(d.id)}
+                                            className="mt-0.5 w-4 h-4 accent-blue-600 shrink-0" />
+                                        <span className="leading-tight">
+                                            <span className="font-medium text-gray-800">{d.title}</span>
+                                            <span className="block text-xs text-gray-400">{d.description}</span>
+                                        </span>
+                                    </label>
+                                ))}
+                            </div>
+                        )}
+                        {errors.document_ids && <p className="mt-1 text-xs text-red-600">{errors.document_ids}</p>}
+                    </div>
+                )}
+
+                <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Вид обучения</label>
+                    <select value={trainingType} onChange={(e) => setTrainingType(e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        {TRAINING_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                    </select>
+                </div>
+
+                <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Время изучения (мин)</label>
+                    <input type="number" min="1" max="9999" value={readingMinutes}
+                        onChange={(e) => setReadingMinutes(parseInt(e.target.value) || 1)}
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input type="checkbox" checked={isMandatory} onChange={(e) => setIsMandatory(e.target.checked)}
+                        className="w-4 h-4 accent-blue-600" />
+                    Обязательное
+                </label>
+
+                <button type="submit" disabled={saving || selectedDocIds.length === 0}
+                    className="w-full px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                    {saving
+                        ? "Добавляем..."
+                        : selectedDocIds.length > 0
+                            ? `Добавить ${selectedDocIds.length} документ${selectedDocIds.length > 1 ? "а" : ""}`
+                            : "Выберите документы"}
+                </button>
+            </form>
+        </div>
+    );
+}
+
+export default function MatrixIndex({ matrix, positions, documents, departments }) {
+    const [filterPos, setFilterPos] = useState("");
+    const [editItem,  setEditItem]  = useState(null);
 
     function remove(id) {
         if (confirm("Удалить запись из матрицы?")) {
@@ -123,10 +283,9 @@ export default function MatrixIndex({ matrix, positions, documents }) {
     }
 
     const filtered = filterPos
-        ? matrix.filter((m) => m.position === positions.find((p) => p.id === Number(filterPos))?.name)
+        ? matrix.filter((m) => m.position_id === Number(filterPos))
         : matrix;
 
-    // Группируем по отделу
     const grouped = filtered.reduce((acc, m) => {
         const key = m.department ?? "Без отдела";
         acc[key] = acc[key] ?? [];
@@ -141,109 +300,24 @@ export default function MatrixIndex({ matrix, positions, documents }) {
             {editItem && <EditModal item={editItem} onClose={() => setEditItem(null)} />}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Форма добавления */}
                 <div className="lg:col-span-1">
-                    <div className="bg-white rounded-xl border border-gray-100 p-5 sticky top-6">
-                        <h2 className="text-sm font-semibold text-gray-700 mb-4">Добавить запись</h2>
-                        <form onSubmit={submit} className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1">Должность *</label>
-                                <select
-                                    value={data.position_id}
-                                    onChange={(e) => setData("position_id", e.target.value)}
-                                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.position_id ? "border-red-300" : "border-gray-200"}`}
-                                >
-                                    <option value="">— Выберите —</option>
-                                    {positions.map((p) => (
-                                        <option key={p.id} value={p.id}>{p.name}</option>
-                                    ))}
-                                </select>
-                                {errors.position_id && <p className="mt-1 text-xs text-red-600">{errors.position_id}</p>}
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1">Документ *</label>
-                                <select
-                                    value={data.document_id}
-                                    onChange={(e) => setData("document_id", e.target.value)}
-                                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.document_id ? "border-red-300" : "border-gray-200"}`}
-                                >
-                                    <option value="">— Выберите —</option>
-                                    {documents.map((d) => (
-                                        <option key={d.id} value={d.id}>{d.description}</option>
-                                    ))}
-                                </select>
-                                {errors.document_id && <p className="mt-1 text-xs text-red-600">{errors.document_id}</p>}
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1">Вид обучения</label>
-                                <select
-                                    value={data.training_type}
-                                    onChange={(e) => setData("training_type", e.target.value)}
-                                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                >
-                                    {TRAINING_TYPES.map((t) => (
-                                        <option key={t.value} value={t.value}>{t.label}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1">
-                                    Время изучения (мин) *
-                                </label>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    max="9999"
-                                    value={data.required_reading_minutes}
-                                    onChange={(e) => setData("required_reading_minutes", parseInt(e.target.value) || 1)}
-                                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.required_reading_minutes ? "border-red-300" : "border-gray-200"}`}
-                                />
-                                {errors.required_reading_minutes && <p className="mt-1 text-xs text-red-600">{errors.required_reading_minutes}</p>}
-                            </div>
-
-                            <label className="flex items-center gap-2 text-sm text-gray-700">
-                                <input
-                                    type="checkbox"
-                                    checked={data.is_mandatory}
-                                    onChange={(e) => setData("is_mandatory", e.target.checked)}
-                                    className="w-4 h-4 accent-blue-600"
-                                />
-                                Обязательное
-                            </label>
-
-                            <button type="submit" disabled={processing}
-                                className="w-full px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50">
-                                {processing ? "Добавляем..." : "Добавить"}
-                            </button>
-                        </form>
-                    </div>
+                    <AddForm positions={positions} documents={documents} matrix={matrix} departments={departments} />
                 </div>
 
-                {/* Таблица */}
                 <div className="lg:col-span-2">
-                    <div className="flex items-center gap-3 mb-4">
+                    <div className="flex items-center gap-3 mb-4 flex-wrap">
                         <p className="text-sm text-gray-500">{matrix.length} записей</p>
                         <ApplyMatrixButton />
-                        <select
-                            value={filterPos}
-                            onChange={(e) => setFilterPos(e.target.value)}
-                            className="ml-auto px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
+                        <select value={filterPos} onChange={(e) => setFilterPos(e.target.value ? Number(e.target.value) : "")}
+                            className="ml-auto px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                             <option value="">Все должности</option>
-                            {positions.map((p) => (
-                                <option key={p.id} value={p.id}>{p.name}</option>
-                            ))}
+                            {positions.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                         </select>
                     </div>
 
                     {Object.entries(grouped).map(([dept, rows]) => (
                         <div key={dept} className="mb-6">
-                            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-                                {dept}
-                            </h3>
+                            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">{dept}</h3>
                             <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
                                 <table className="w-full text-sm">
                                     <thead className="bg-gray-50 border-b border-gray-100">
@@ -252,13 +326,13 @@ export default function MatrixIndex({ matrix, positions, documents }) {
                                             <th className="text-left px-4 py-2 font-medium text-gray-500">Документ</th>
                                             <th className="text-left px-4 py-2 font-medium text-gray-500">Вид</th>
                                             <th className="text-left px-4 py-2 font-medium text-gray-500">Время</th>
-                                            <th className="text-left px-4 py-2 font-medium text-gray-500">Обяз.</th>
+                                            <th className="text-center px-4 py-2 font-medium text-gray-500">Обяз.</th>
                                             <th className="px-4 py-2" />
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-50">
                                         {rows.map((m) => (
-                                            <tr key={m.id} className="hover:bg-gray-50">
+                                            <tr key={m.id} className="hover:bg-gray-50 transition-colors">
                                                 <td className="px-4 py-2.5 text-gray-700">{m.position}</td>
                                                 <td className="px-4 py-2.5 text-gray-600">{m.document}</td>
                                                 <td className="px-4 py-2.5">
@@ -266,28 +340,20 @@ export default function MatrixIndex({ matrix, positions, documents }) {
                                                         {TRAINING_TYPES.find((t) => t.value === m.training_type)?.label ?? m.training_type}
                                                     </span>
                                                 </td>
-                                                <td className="px-4 py-2.5 text-xs text-gray-500">
-                                                    {m.required_reading_minutes} мин
-                                                </td>
+                                                <td className="px-4 py-2.5 text-xs text-gray-500">{m.required_reading_minutes} мин</td>
                                                 <td className="px-4 py-2.5 text-center">
-                                                    {m.is_mandatory ? (
-                                                        <span className="text-green-600 text-xs">✓</span>
-                                                    ) : (
-                                                        <span className="text-gray-300 text-xs">—</span>
-                                                    )}
+                                                    {m.is_mandatory
+                                                        ? <span className="text-green-600 text-xs">✓</span>
+                                                        : <span className="text-gray-300 text-xs">—</span>}
                                                 </td>
                                                 <td className="px-4 py-2.5 text-right">
                                                     <div className="flex items-center justify-end gap-3">
-                                                        <button
-                                                            onClick={() => setEditItem(m)}
-                                                            className="text-xs text-blue-500 hover:text-blue-700"
-                                                        >
+                                                        <button onClick={() => setEditItem(m)}
+                                                            className="text-xs text-blue-500 hover:text-blue-700">
                                                             Изменить
                                                         </button>
-                                                        <button
-                                                            onClick={() => remove(m.id)}
-                                                            className="text-xs text-red-400 hover:text-red-600"
-                                                        >
+                                                        <button onClick={() => remove(m.id)}
+                                                            className="text-xs text-red-400 hover:text-red-600">
                                                             Удалить
                                                         </button>
                                                     </div>

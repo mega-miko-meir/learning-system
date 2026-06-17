@@ -48,7 +48,7 @@ class AuthController extends Controller
         // Ищем пользователя
         $user = $isPhone
             ? User::where('phone', $login)->where('role', 'employee')->first()
-            : User::where('email', $login)->whereIn('role', ['superadmin', 'admin', 'hr_admin', 'manager'])->first();
+            : User::where('email', $login)->first();
 
         // Проверяем пароль
         if (!$user || !Hash::check($request->password, $user->password)) {

@@ -13,7 +13,7 @@ class TrainingMatrix extends Model
 
     protected $fillable = [
         'position_id', 'document_id', 'training_type',
-        'is_mandatory', 'is_active', 'required_reading_minutes',
+        'is_mandatory', 'is_active', 'required_reading_minutes', 'auto_assign',
     ];
 
     protected function casts(): array
@@ -21,6 +21,7 @@ class TrainingMatrix extends Model
         return [
             'is_mandatory'             => 'boolean',
             'is_active'                => 'boolean',
+            'auto_assign'              => 'boolean',
             'required_reading_minutes' => 'integer',
         ];
     }

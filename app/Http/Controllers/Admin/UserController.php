@@ -70,17 +70,22 @@ class UserController extends Controller
 
     public function store(Request $request)
     {
+        $isEmployee = $request->role === 'employee';
+
         $data = $request->validate([
             'last_name'     => ['required', 'string', 'max:100'],
             'first_name'    => ['required', 'string', 'max:100'],
             'middle_name'   => ['nullable', 'string', 'max:100'],
             'role'          => ['required', Rule::in(['admin', 'hr_admin', 'manager', 'employee'])],
-            'phone'         => ['required_if:role,employee', 'nullable', 'string', 'max:20', 'unique:users,phone'],
-            'email'         => ['required_unless:role,employee', 'nullable', 'email', 'unique:users,email'],
+            'phone'         => array_filter(['nullable', 'string', 'max:20', 'unique:users,phone', $isEmployee ? 'required_without:email' : null]),
+            'email'         => array_filter(['nullable', 'email', 'unique:users,email', $isEmployee ? 'required_without:phone' : 'required']),
             'department_id' => ['nullable', 'exists:departments,id'],
             'position_id'   => ['nullable', 'exists:positions,id'],
             'manager_id'    => ['nullable', 'exists:users,id'],
             'hired_at'      => ['nullable', 'date'],
+        ], [
+            'phone.required_without' => 'Укажите телефон или email.',
+            'email.required_without' => 'Укажите email или телефон.',
         ]);
 
         $tempPassword = 'Temp' . rand(1000, 9999) . '!';
@@ -92,6 +97,10 @@ class UserController extends Controller
             'must_change_password' => $mustChange,
             'is_active'            => true,
         ]);
+
+        if ($user->position_id) {
+            $this->assignTrainingByPosition($user);
+        }
 
         AuditLog::create([
             'user_id'    => auth()->id(),
@@ -284,21 +293,31 @@ class UserController extends Controller
 
     public function update(Request $request, User $user)
     {
+        $isEmployee = $user->role === 'employee';
+
         $data = $request->validate([
             'last_name'     => ['required', 'string', 'max:100'],
             'first_name'    => ['required', 'string', 'max:100'],
             'middle_name'   => ['nullable', 'string', 'max:100'],
-            'phone'         => ['nullable', 'string', 'max:20', Rule::unique('users', 'phone')->ignore($user->id)],
-            'email'         => ['nullable', 'email', Rule::unique('users', 'email')->ignore($user->id)],
+            'phone'         => array_filter(['nullable', 'string', 'max:20', Rule::unique('users', 'phone')->ignore($user->id), $isEmployee ? 'required_without:email' : null]),
+            'email'         => array_filter(['nullable', 'email', Rule::unique('users', 'email')->ignore($user->id), $isEmployee ? 'required_without:phone' : 'required']),
             'department_id' => ['nullable', 'exists:departments,id'],
             'position_id'   => ['nullable', 'exists:positions,id'],
             'manager_id'    => ['nullable', 'exists:users,id'],
             'hired_at'      => ['nullable', 'date'],
+        ], [
+            'phone.required_without' => 'Укажите телефон или email.',
+            'email.required_without' => 'Укажите email или телефон.',
         ]);
 
-        $oldValues = $user->only(array_keys($data));
+        $oldPositionId = $user->position_id;
+        $oldValues     = $user->only(array_keys($data));
 
         $user->update($data);
+
+        if (isset($data['position_id']) && (string) $data['position_id'] !== (string) $oldPositionId && $user->position_id) {
+            $this->assignTrainingByPosition($user->fresh());
+        }
 
         AuditLog::create([
             'user_id'    => auth()->id(),

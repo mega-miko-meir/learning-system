@@ -22,6 +22,8 @@ class MatrixController extends Controller
             ->get()
             ->map(fn($m) => [
                 'id'                       => $m->id,
+                'position_id'              => $m->position_id,
+                'document_id'              => $m->document_id,
                 'position'                 => $m->position->name,
                 'department'               => $m->position->department?->name,
                 'document'                 => $m->document->display_name,
@@ -30,36 +32,58 @@ class MatrixController extends Controller
                 'required_reading_minutes' => $m->required_reading_minutes,
             ]);
 
-        $positions = Position::active()->with('department')->orderBy('name')->get(['id', 'name', 'department_id']);
-        $documents = Document::active()->orderBy('description')->get(['id', 'title', 'description']);
+        $departments = \App\Models\Department::active()->orderBy('name')->get(['id', 'name']);
+        $positions   = Position::active()->with('department')->orderBy('name')->get(['id', 'name', 'department_id']);
+        $documents   = Document::active()->orderBy('description')->get(['id', 'title', 'description']);
 
-        return Inertia::render('Admin/Matrix/Index', compact('matrix', 'positions', 'documents'));
+        return Inertia::render('Admin/Matrix/Index', compact('matrix', 'positions', 'documents', 'departments'));
     }
 
     public function store(Request $request)
     {
         $data = $request->validate([
             'position_id'              => ['required', 'exists:positions,id'],
-            'document_id'              => ['required', 'exists:documents,id'],
+            'document_ids'             => ['required', 'array', 'min:1'],
+            'document_ids.*'           => ['exists:documents,id'],
             'training_type'            => ['required', Rule::in(['primary', 'periodic', 'unplanned', 'special'])],
             'is_mandatory'             => ['boolean'],
             'required_reading_minutes' => ['required', 'integer', 'min:1', 'max:9999'],
         ]);
 
-        TrainingMatrix::updateOrCreate(
-            ['position_id' => $data['position_id'], 'document_id' => $data['document_id']],
-            [...$data, 'is_active' => true]
-        );
+        $created = 0;
+        foreach ($data['document_ids'] as $documentId) {
+            $existed = TrainingMatrix::where('position_id', $data['position_id'])
+                ->where('document_id', $documentId)
+                ->exists();
 
-        return back()->with('success', 'Запись добавлена в матрицу.');
+            if (!$existed) {
+                TrainingMatrix::create([
+                    'position_id'              => $data['position_id'],
+                    'document_id'              => $documentId,
+                    'training_type'            => $data['training_type'],
+                    'is_mandatory'             => $data['is_mandatory'] ?? false,
+                    'required_reading_minutes' => $data['required_reading_minutes'],
+                    'is_active'                => true,
+                ]);
+                $created++;
+            }
+        }
+
+        $skipped = count($data['document_ids']) - $created;
+        $message = "Добавлено в матрицу: {$created} документов.";
+        if ($skipped > 0) {
+            $message .= " Пропущено (уже есть): {$skipped}.";
+        }
+
+        return back()->with('success', $message);
     }
 
     public function update(Request $request, TrainingMatrix $matrix)
     {
         $data = $request->validate([
-            'training_type'            => ['required', Rule::in(['primary', 'periodic', 'unplanned', 'special'])],
+            'training_type'            => ['sometimes', 'required', Rule::in(['primary', 'periodic', 'unplanned', 'special'])],
             'is_mandatory'             => ['boolean'],
-            'required_reading_minutes' => ['required', 'integer', 'min:1', 'max:9999'],
+            'required_reading_minutes' => ['sometimes', 'required', 'integer', 'min:1', 'max:9999'],
         ]);
 
         $matrix->update($data);

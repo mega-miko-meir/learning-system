@@ -89,6 +89,11 @@ export default function UserForm({ user, departments, managers }) {
                     )}
 
                     {/* Контакты */}
+                    {data.role === "employee" && (
+                        <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                            Укажите телефон <strong>или</strong> email — хотя бы одно обязательно. Это будет использоваться для входа в систему.
+                        </p>
+                    )}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -106,7 +111,7 @@ export default function UserForm({ user, departments, managers }) {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                Email {data.role !== "employee" ? "*" : ""}
+                                Email *
                             </label>
                             <input
                                 type="email"
