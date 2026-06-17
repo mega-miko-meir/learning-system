@@ -221,57 +221,97 @@ class DocumentController extends Controller
 
     private function compressPdf(string $storagePath): void
     {
-        // Только PDF
         if (!str_ends_with(strtolower($storagePath), '.pdf')) {
             return;
         }
 
-        $gs = $this->findGhostscript();
-        if (!$gs) {
+        $original = storage_path('app/public/' . $storagePath);
+
+        // Пробуем системные утилиты (gs, qpdf) — быстрее и эффективнее
+        if ($this->compressWithSystemTool($original)) {
             return;
         }
 
-        $original   = storage_path('app/public/' . $storagePath);
-        $compressed = $original . '.tmp.pdf';
+        // Запасной вариант: чистый PHP через FPDI (работает для PDF 1.4 и ниже)
+        $this->compressWithFpdi($original);
+    }
 
-        try {
+    private function compressWithSystemTool(string $path): bool
+    {
+        $tmp = $path . '.tmp.pdf';
+
+        // Ghostscript
+        $gs = $this->which('gs') ?? $this->which('gswin64c') ?? $this->which('gswin32c');
+        if ($gs) {
             $cmd = sprintf(
                 '%s -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/ebook'
                 . ' -dNOPAUSE -dQUIET -dBATCH -sOutputFile=%s %s 2>/dev/null',
-                escapeshellcmd($gs),
-                escapeshellarg($compressed),
-                escapeshellarg($original)
+                escapeshellcmd($gs), escapeshellarg($tmp), escapeshellarg($path)
             );
-
-            exec($cmd, $output, $exitCode);
-
-            if ($exitCode === 0
-                && file_exists($compressed)
-                && filesize($compressed) > 0
-                && filesize($compressed) < filesize($original)
-            ) {
-                rename($compressed, $original);
-                Log::info("PDF compressed: {$storagePath} → " . round(filesize($original) / 1024) . ' KB');
-            } elseif (file_exists($compressed)) {
-                unlink($compressed);
+            exec($cmd, $out, $code);
+            if ($code === 0 && $this->swapIfSmaller($path, $tmp)) {
+                return true;
             }
+            @unlink($tmp);
+        }
+
+        // qpdf — часто предустановлен на Ubuntu без sudo
+        $qpdf = $this->which('qpdf');
+        if ($qpdf) {
+            $cmd = sprintf(
+                '%s --compress-streams=y --recompress-flate --compression-level=9 %s %s 2>/dev/null',
+                escapeshellcmd($qpdf), escapeshellarg($path), escapeshellarg($tmp)
+            );
+            exec($cmd, $out, $code);
+            if ($code === 0 && $this->swapIfSmaller($path, $tmp)) {
+                return true;
+            }
+            @unlink($tmp);
+        }
+
+        return false;
+    }
+
+    private function compressWithFpdi(string $path): void
+    {
+        try {
+            $pdf       = new \setasign\Fpdi\Fpdi('P', 'pt');
+            $pageCount = $pdf->setSourceFile($path);
+
+            for ($i = 1; $i <= $pageCount; $i++) {
+                $tpl  = $pdf->importPage($i);
+                $size = $pdf->getTemplateSize($tpl);
+                $pdf->AddPage($size['width'] > $size['height'] ? 'L' : 'P', [$size['width'], $size['height']]);
+                $pdf->useTemplate($tpl);
+            }
+
+            $tmp = $path . '.tmp.pdf';
+            $pdf->Output('F', $tmp);
+            $this->swapIfSmaller($path, $tmp);
         } catch (\Throwable $e) {
-            Log::warning('PDF compression failed: ' . $e->getMessage());
-            if (file_exists($compressed)) {
-                unlink($compressed);
-            }
+            // PDF 1.5+ с compressed cross-reference tables не поддерживается FPDI free
+            Log::info('PDF compression skipped (FPDI): ' . $e->getMessage());
+            @unlink($path . '.tmp.pdf');
         }
     }
 
-    private function findGhostscript(): ?string
+    private function swapIfSmaller(string $original, string $compressed): bool
     {
-        foreach (['gs', 'gswin64c', 'gswin32c'] as $bin) {
-            exec("which {$bin} 2>/dev/null", $out, $code);
-            if ($code === 0 && !empty($out[0])) {
-                return trim($out[0]);
-            }
-            $out = [];
+        if (file_exists($compressed)
+            && filesize($compressed) > 0
+            && filesize($compressed) < filesize($original)
+        ) {
+            rename($compressed, $original);
+            Log::info('PDF compressed: ' . basename($original) . ' → ' . round(filesize($original) / 1024) . ' KB');
+            return true;
         }
-        return null;
+        @unlink($compressed);
+        return false;
+    }
+
+    private function which(string $bin): ?string
+    {
+        exec("which {$bin} 2>/dev/null", $out, $code);
+        return ($code === 0 && !empty($out[0])) ? trim($out[0]) : null;
     }
 }
