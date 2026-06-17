@@ -8,6 +8,7 @@ use App\Models\Document;
 use App\Models\TrainingAssignment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class DocumentController extends Controller
@@ -149,12 +150,17 @@ class DocumentController extends Controller
 
     public function forceDestroy(Document $document)
     {
-        $title = $document->display_name;
-        $id    = $document->id;
+        $title    = $document->display_name;
+        $id       = $document->id;
+        $filePath = $document->file_path;
 
         // Каскадное удаление через onDelete('cascade') в БД:
         // test → questions → answers, training_assignments → test_attempts → attempt_answers, training_matrix
         $document->delete();
+
+        if ($filePath) {
+            Storage::disk('public')->delete($filePath);
+        }
 
         AuditLog::create([
             'user_id'     => auth()->id(),
@@ -177,6 +183,8 @@ class DocumentController extends Controller
             'file' => ['required', 'file', 'mimes:pdf,doc,docx', 'max:20480'],
         ]);
 
+        $oldPath = $document->file_path;
+
         $path = $request->file('file')->store('documents', 'public');
         $this->compressPdf($path);
 
@@ -184,6 +192,10 @@ class DocumentController extends Controller
             'file_path' => $path,
             'version'   => $document->version + 1,
         ]);
+
+        if ($oldPath) {
+            Storage::disk('public')->delete($oldPath);
+        }
 
         // GxP: при новой версии документа все сотрудники, у которых он был в матрице,
         // получают статус «Требуется повторное обучение» (pending)
