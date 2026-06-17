@@ -273,8 +273,9 @@ function AddForm({ positions, documents, matrix, departments }) {
 }
 
 export default function MatrixIndex({ matrix, positions, documents, departments }) {
-    const [filterPos, setFilterPos] = useState("");
-    const [editItem,  setEditItem]  = useState(null);
+    const [filterDept, setFilterDept] = useState("");
+    const [filterPos,  setFilterPos]  = useState("");
+    const [editItem,   setEditItem]   = useState(null);
 
     function remove(id) {
         if (confirm("Удалить запись из матрицы?")) {
@@ -282,9 +283,21 @@ export default function MatrixIndex({ matrix, positions, documents, departments 
         }
     }
 
-    const filtered = filterPos
-        ? matrix.filter((m) => m.position_id === Number(filterPos))
-        : matrix;
+    function handleFilterDeptChange(id) {
+        setFilterDept(id);
+        setFilterPos("");
+    }
+
+    const filteredPositionsForFilter = useMemo(() =>
+        filterDept ? positions.filter((p) => p.department_id === Number(filterDept)) : positions,
+        [filterDept, positions]
+    );
+
+    const filtered = useMemo(() => matrix.filter((m) => {
+        if (filterDept && m.department_id !== Number(filterDept)) return false;
+        if (filterPos  && m.position_id  !== Number(filterPos))  return false;
+        return true;
+    }), [matrix, filterDept, filterPos]);
 
     const grouped = filtered.reduce((acc, m) => {
         const key = m.department ?? "Без отдела";
@@ -306,13 +319,25 @@ export default function MatrixIndex({ matrix, positions, documents, departments 
 
                 <div className="lg:col-span-2">
                     <div className="flex items-center gap-3 mb-4 flex-wrap">
-                        <p className="text-sm text-gray-500">{matrix.length} записей</p>
+                        <p className="text-sm text-gray-500">
+                            {filtered.length !== matrix.length
+                                ? <>{filtered.length} <span className="text-gray-400">из {matrix.length}</span></>
+                                : <>{matrix.length} записей</>
+                            }
+                        </p>
                         <ApplyMatrixButton />
-                        <select value={filterPos} onChange={(e) => setFilterPos(e.target.value ? Number(e.target.value) : "")}
-                            className="ml-auto px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="">Все должности</option>
-                            {positions.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                        </select>
+                        <div className="ml-auto flex gap-2">
+                            <select value={filterDept} onChange={(e) => handleFilterDeptChange(e.target.value)}
+                                className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Все отделы</option>
+                                {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                            </select>
+                            <select value={filterPos} onChange={(e) => setFilterPos(e.target.value ? Number(e.target.value) : "")}
+                                className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Все должности</option>
+                                {filteredPositionsForFilter.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                        </div>
                     </div>
 
                     {Object.entries(grouped).map(([dept, rows]) => (

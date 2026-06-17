@@ -26,6 +26,7 @@ class MatrixController extends Controller
                 'document_id'              => $m->document_id,
                 'position'                 => $m->position->name,
                 'department'               => $m->position->department?->name,
+                'department_id'            => $m->position->department?->id,
                 'document'                 => $m->document->display_name,
                 'training_type'            => $m->training_type,
                 'is_mandatory'             => $m->is_mandatory,
