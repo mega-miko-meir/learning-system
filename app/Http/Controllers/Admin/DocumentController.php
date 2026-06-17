@@ -7,6 +7,7 @@ use App\Models\AuditLog;
 use App\Models\Document;
 use App\Models\TrainingAssignment;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class DocumentController extends Controller
@@ -56,6 +57,7 @@ class DocumentController extends Controller
         ]);
 
         $path = $request->file('file')->store('documents', 'public');
+        $this->compressPdf($path);
 
         $document = Document::create([
             'title'       => $data['title'],
@@ -176,6 +178,7 @@ class DocumentController extends Controller
         ]);
 
         $path = $request->file('file')->store('documents', 'public');
+        $this->compressPdf($path);
 
         $document->update([
             'file_path' => $path,
@@ -212,5 +215,63 @@ class DocumentController extends Controller
         ]);
 
         return back()->with('success', "Загружена версия {$document->version}. Переназначено обучений: {$reassigned->count()}.");
+    }
+
+    // ─── PDF compression ─────────────────────────────────────────────────────
+
+    private function compressPdf(string $storagePath): void
+    {
+        // Только PDF
+        if (!str_ends_with(strtolower($storagePath), '.pdf')) {
+            return;
+        }
+
+        $gs = $this->findGhostscript();
+        if (!$gs) {
+            return;
+        }
+
+        $original   = storage_path('app/public/' . $storagePath);
+        $compressed = $original . '.tmp.pdf';
+
+        try {
+            $cmd = sprintf(
+                '%s -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/ebook'
+                . ' -dNOPAUSE -dQUIET -dBATCH -sOutputFile=%s %s 2>/dev/null',
+                escapeshellcmd($gs),
+                escapeshellarg($compressed),
+                escapeshellarg($original)
+            );
+
+            exec($cmd, $output, $exitCode);
+
+            if ($exitCode === 0
+                && file_exists($compressed)
+                && filesize($compressed) > 0
+                && filesize($compressed) < filesize($original)
+            ) {
+                rename($compressed, $original);
+                Log::info("PDF compressed: {$storagePath} → " . round(filesize($original) / 1024) . ' KB');
+            } elseif (file_exists($compressed)) {
+                unlink($compressed);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('PDF compression failed: ' . $e->getMessage());
+            if (file_exists($compressed)) {
+                unlink($compressed);
+            }
+        }
+    }
+
+    private function findGhostscript(): ?string
+    {
+        foreach (['gs', 'gswin64c', 'gswin32c'] as $bin) {
+            exec("which {$bin} 2>/dev/null", $out, $code);
+            if ($code === 0 && !empty($out[0])) {
+                return trim($out[0]);
+            }
+            $out = [];
+        }
+        return null;
     }
 }
