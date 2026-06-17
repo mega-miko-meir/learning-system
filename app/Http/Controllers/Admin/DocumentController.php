@@ -54,7 +54,7 @@ class DocumentController extends Controller
             'type'        => ['required', 'string'],
             'description' => ['required', 'string'],
             'version'     => ['required', 'integer', 'min:1', 'max:255'],
-            'file'        => ['required', 'file', 'mimes:pdf,doc,docx', 'max:20480'],
+            'file'        => ['required', 'file', 'mimes:pdf,doc,docx', 'max:51200'],
         ]);
 
         $path = $request->file('file')->store('documents', 'public');
@@ -180,7 +180,7 @@ class DocumentController extends Controller
     public function uploadNewVersion(Request $request, Document $document)
     {
         $request->validate([
-            'file' => ['required', 'file', 'mimes:pdf,doc,docx', 'max:20480'],
+            'file' => ['required', 'file', 'mimes:pdf,doc,docx', 'max:51200'],
         ]);
 
         $oldPath = $document->file_path;
