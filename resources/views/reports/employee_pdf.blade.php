@@ -110,7 +110,7 @@ table.data tr:nth-child(even) td { background: #f8fafc; }
         <tbody>
             @foreach($assignments as $a)
             <tr>
-                <td>{{ $a->document->title }}</td>
+                <td>{{ $a->document->display_name }}</td>
                 <td>v{{ $a->document->version }}</td>
                 <td>{{ ['primary'=>'Первичное','periodic'=>'Периодическое','unplanned'=>'Внеплановое','special'=>'Специальное'][$a->training_type] ?? $a->training_type }}</td>
                 <td>

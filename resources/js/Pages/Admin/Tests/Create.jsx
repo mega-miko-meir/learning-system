@@ -1,5 +1,5 @@
 import { Head, Link, router } from "@inertiajs/react";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import AppLayout from "../../../Layouts/AppLayout";
 
 let _id = 0;
@@ -170,7 +170,9 @@ export default function TestCreate({ documents, document_id, test }) {
     const isEdit = !!test;
 
     const [title, setTitle]               = useState(test?.title ?? "");
+
     const [docId, setDocId]               = useState(test?.document_id ? String(test.document_id) : (document_id ?? ""));
+    const selectedDoc = useMemo(() => documents.find((d) => String(d.id) === String(docId)) ?? null, [docId, documents]);
     const [passingScore, setPassingScore] = useState(test?.passing_score ?? 70);
     const [timeLimit, setTimeLimit]       = useState(test?.time_limit ?? "");
     const [maxAttempts, setMaxAttempts]   = useState(test?.max_attempts ?? 3);
@@ -361,10 +363,26 @@ export default function TestCreate({ documents, document_id, test }) {
                         >
                             <option value="">— Без документа —</option>
                             {documents.map((d) => (
-                                <option key={d.id} value={d.id}>{d.title}</option>
+                                <option key={d.id} value={d.id}>{d.description}</option>
                             ))}
                         </select>
                         {errors.document_id && <p className="mt-1 text-xs text-red-600">{errors.document_id}</p>}
+
+                        {selectedDoc && (
+                            <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1.5 px-3 py-2.5 bg-blue-50 border border-blue-100 rounded-lg text-xs">
+                                {[
+                                    ["Тип документа", selectedDoc.type],
+                                    ["Код документа",  selectedDoc.title],
+                                    ["Название",       selectedDoc.description],
+                                    ["Версия",         selectedDoc.version],
+                                ].map(([label, val]) => (
+                                    <div key={label} className="flex gap-1.5">
+                                        <span className="text-blue-400 shrink-0">{label}:</span>
+                                        <span className="text-blue-800 font-medium truncate">{val || "—"}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-3 gap-4">

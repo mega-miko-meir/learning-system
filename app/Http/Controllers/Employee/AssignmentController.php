@@ -20,7 +20,7 @@ class AssignmentController extends Controller
             ->withQueryString()
             ->through(fn($a) => [
                 'id'           => $a->id,
-                'document'     => $a->document->title,
+                'document'     => $a->document->display_name,
                 'type'         => $a->training_type,
                 'status'       => $a->status,
                 'due_date'     => $a->due_date?->format('d.m.Y'),
@@ -45,7 +45,7 @@ class AssignmentController extends Controller
                 'id'                 => $assignment->id,
                 'document'           => [
                     'id'          => $assignment->document->id,
-                    'title'       => $assignment->document->title,
+                    'title'       => $assignment->document->display_name,
                     'version'     => $assignment->document->version,
                     'description' => $assignment->document->description,
                 ],

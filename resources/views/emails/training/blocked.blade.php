@@ -27,7 +27,7 @@ td:last-child{color:#111827}
         <tr><td>Сотрудник</td><td><strong>{{ $assignment->user->full_name }}</strong></td></tr>
         <tr><td>Отдел</td><td>{{ $assignment->user->department?->name ?? '—' }}</td></tr>
         <tr><td>Должность</td><td>{{ $assignment->user->position?->name ?? '—' }}</td></tr>
-        <tr><td>Документ</td><td>{{ $assignment->document->title }} (v{{ $assignment->document->version }})</td></tr>
+        <tr><td>Документ</td><td>{{ $assignment->document->display_name }} (v{{ $assignment->document->version }})</td></tr>
         <tr><td>Вид обучения</td><td>{{ ['primary'=>'Первичное','periodic'=>'Периодическое','unplanned'=>'Внеплановое','special'=>'Специальное'][$assignment->training_type] ?? $assignment->training_type }}</td></tr>
         <tr><td>Дата</td><td>{{ now()->format('d.m.Y H:i') }}</td></tr>
     </table>

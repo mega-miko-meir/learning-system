@@ -31,7 +31,7 @@ class AssignmentController extends Controller
                 'user_id'         => $a->user->id,
                 'user'            => $a->user->full_name,
                 'document_id'     => $a->document->id,
-                'document'        => $a->document->title,
+                'document'        => $a->document->display_name,
                 'type'            => $a->training_type,
                 'status'          => $a->status,
                 'due_date'        => $a->due_date?->format('d.m.Y'),
@@ -43,7 +43,7 @@ class AssignmentController extends Controller
         $departments = Department::active()->orderBy('name')->get(['id', 'name']);
         $positions   = Position::active()->with('department')->orderBy('name')
             ->get(['id', 'name', 'department_id']);
-        $documents   = Document::active()->orderBy('title')->get(['id', 'title']);
+        $documents   = Document::active()->orderBy('description')->get(['id', 'title', 'description']);
 
         return Inertia::render('Admin/Assignments/Index', compact(
             'assignments', 'departments', 'positions', 'documents'
@@ -61,7 +61,7 @@ class AssignmentController extends Controller
         ]);
 
         $userIds = User::active()
-            ->where('role', 'employee')
+            ->whereIn('role', ['employee', 'hr_admin', 'manager'])
             ->where('position_id', $data['position_id'])
             ->pluck('id');
 

@@ -83,7 +83,7 @@ class TrainingRegistryExport implements FromQuery, WithHeadings, WithMapping, Sh
             $row->user->department?->name ?? '—',
             $row->user->position?->name   ?? '—',
             self::$trainingTypes[$row->training_type] ?? $row->training_type,
-            $row->document->title,
+            $row->document->display_name,
             'v' . $row->document->version,
             self::$statuses[$row->status] ?? $row->status,
             $row->created_at->format('d.m.Y'),

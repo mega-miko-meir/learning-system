@@ -189,7 +189,7 @@ export default function AssignmentsIndex({ assignments, departments, positions, 
                                 >
                                     <option value="">— Выберите документ —</option>
                                     {documents.map((d) => (
-                                        <option key={d.id} value={d.id}>{d.title}</option>
+                                        <option key={d.id} value={d.id}>{d.description}</option>
                                     ))}
                                 </select>
                                 {bulkForm.errors.document_id && (

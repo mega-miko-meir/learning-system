@@ -12,11 +12,12 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // ─── Отделы ──────────────────────────────────────────
-        $deptQA  = Department::create(['name' => 'Отдел обеспечения качества']);
-        $deptHR  = Department::create(['name' => 'Отдел кадров']);
-        $deptProd = Department::create(['name' => 'Производственный отдел']);
-        $deptIT  = Department::create(['name' => 'IT отдел']);
+        // ─── Отделы (Приложение 1) ─────────────────────────────
+        $this->call(DepartmentSeeder::class);
+        $deptQA   = Department::where('short_name', 'ООК')->first();
+        $deptHR   = Department::where('short_name', 'ОК')->first();
+        $deptProd = Department::where('short_name', 'ПР')->first();
+        $deptIT   = Department::where('short_name', 'ОИТ')->first();
 
         // ─── Должности ───────────────────────────────────────
         $posQASpec    = Position::create(['name' => 'Специалист по качеству', 'department_id' => $deptQA->id]);

@@ -44,7 +44,41 @@ class ReportController extends Controller
             ->filter(fn($d) => $d['employees'] > 0)
             ->values();
 
-        return Inertia::render('Admin/Reports/Index', compact('summary', 'byDepartment'));
+        // Агрегированная статистика по каждому сотруднику — один запрос вместо N×3
+        $stats = TrainingAssignment::selectRaw('
+            user_id,
+            COUNT(*) as total,
+            SUM(CASE WHEN status = "completed" THEN 1 ELSE 0 END) as completed,
+            SUM(CASE WHEN status IN ("pending", "in_progress") AND due_date < NOW() THEN 1 ELSE 0 END) as overdue,
+            SUM(CASE WHEN status = "failed" THEN 1 ELSE 0 END) as failed
+        ')->groupBy('user_id')->get()->keyBy('user_id');
+
+        $employees = User::active()->employees()
+            ->with(['department', 'position'])
+            ->orderBy('last_name')
+            ->get()
+            ->map(function ($emp) use ($stats) {
+                $s         = $stats->get($emp->id);
+                $total     = (int) ($s?->total ?? 0);
+                $completed = (int) ($s?->completed ?? 0);
+                $overdue   = (int) ($s?->overdue ?? 0);
+                $failed    = (int) ($s?->failed ?? 0);
+
+                return [
+                    'id'         => $emp->id,
+                    'full_name'  => $emp->full_name,
+                    'department' => $emp->department?->name,
+                    'position'   => $emp->position?->name,
+                    'total'      => $total,
+                    'completed'  => $completed,
+                    'overdue'    => $overdue,
+                    'failed'     => $failed,
+                    'percent'    => $total > 0 ? round($completed / $total * 100) : 0,
+                ];
+            })
+            ->values();
+
+        return Inertia::render('Admin/Reports/Index', compact('summary', 'byDepartment', 'employees'));
     }
 
     public function employee(User $user)

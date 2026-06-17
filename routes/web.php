@@ -69,6 +69,7 @@ Route::middleware(['auth', 'user.active'])->group(function () {
         Route::post('/users/{user}/deactivate', [\App\Http\Controllers\Admin\UserController::class, 'deactivate'])->name('users.deactivate');
         Route::post('/users/{user}/activate', [\App\Http\Controllers\Admin\UserController::class, 'activate'])->name('users.activate');
         Route::post('/users/{user}/reset-password', [\App\Http\Controllers\Admin\UserController::class, 'resetPassword'])->name('users.reset-password');
+        Route::post('/users/{user}/assignments', [\App\Http\Controllers\Admin\UserController::class, 'storeAssignment'])->name('users.assignments.store');
         Route::post('/users/{user}/assign-training', [\App\Http\Controllers\Admin\UserController::class, 'assignTraining'])->name('users.assign-training');
 
         // Документы
@@ -122,9 +123,10 @@ Route::middleware(['auth', 'user.active'])->group(function () {
         Route::post('/users/{user}/deactivate', [\App\Http\Controllers\HR\UserController::class, 'deactivate'])->name('users.deactivate');
         Route::post('/users/{user}/activate', [\App\Http\Controllers\HR\UserController::class, 'activate'])->name('users.activate');
         Route::post('/users/{user}/reset-password', [\App\Http\Controllers\HR\UserController::class, 'resetPassword'])->name('users.reset-password');
+        Route::post('/users/{user}/assignments', [\App\Http\Controllers\HR\UserController::class, 'assignTraining'])->name('users.assign-training');
 
-        // Справочники (только просмотр)
-        Route::get('/departments', [\App\Http\Controllers\HR\DepartmentController::class, 'index'])->name('departments.index');
-        Route::get('/positions', [\App\Http\Controllers\HR\PositionController::class, 'index'])->name('positions.index');
+        // Справочники
+        Route::resource('departments', \App\Http\Controllers\HR\DepartmentController::class)->only(['index', 'create', 'store', 'edit', 'update']);
+        Route::resource('positions', \App\Http\Controllers\HR\PositionController::class)->only(['index', 'create', 'store', 'edit', 'update']);
     });
 });

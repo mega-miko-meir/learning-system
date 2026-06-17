@@ -3,13 +3,18 @@
 namespace App\Http\Controllers\HR;
 
 use App\Http\Controllers\Controller;
+use App\Mail\NewEmployeeInduction;
+use App\Mail\NewTrainingAssigned;
 use App\Models\AuditLog;
 use App\Models\Department;
+use App\Models\Document;
 use App\Models\TrainingAssignment;
 use App\Models\TrainingMatrix;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
@@ -50,7 +55,7 @@ class UserController extends Controller
     public function create()
     {
         return Inertia::render('HR/Users/Form', [
-            'departments' => Department::active()->with('positions')->orderBy('name')->get(),
+            'departments' => Department::active()->with(['positions' => fn($q) => $q->active()->orderBy('name')])->orderBy('name')->get(),
             'managers'    => User::active()->whereIn('role', ['manager', 'admin'])->orderBy('last_name')->get(['id', 'last_name', 'first_name', 'middle_name']),
             'user'        => null,
         ]);
@@ -80,10 +85,6 @@ class UserController extends Controller
             'is_active'            => true,
         ]);
 
-        if ($user->position_id) {
-            $this->assignTrainingByPosition($user);
-        }
-
         AuditLog::create([
             'user_id'     => auth()->id(),
             'user_name'   => auth()->user()->full_name,
@@ -111,7 +112,7 @@ class UserController extends Controller
             ->get()
             ->map(fn($a) => [
                 'id'           => $a->id,
-                'document'     => $a->document->title,
+                'document'     => $a->document->display_name,
                 'type'         => $a->training_type,
                 'status'       => $a->status,
                 'due_date'     => $a->due_date?->format('d.m.Y'),
@@ -131,13 +132,121 @@ class UserController extends Controller
                 'fired_at'   => $user->fired_at?->format('d.m.Y'),
             ],
             'assignments' => $assignments,
+            'documents'   => $this->positionDocuments($user),
         ]);
+    }
+
+    public function assignTraining(Request $request, User $user)
+    {
+        $data = $request->validate([
+            'document_ids'     => ['required', 'array', 'min:1'],
+            'document_ids.*'   => ['exists:documents,id'],
+            'training_type'    => ['required', 'in:primary,periodic,unplanned,special'],
+            'reading_minutes'  => ['required', 'integer', 'in:5,10,15,20,30,45,60'],
+        ]);
+
+        // Первичный инструктаж всегда проводится день в день с оформлением.
+        $dueDate = $data['training_type'] === 'primary' ? now() : now()->addDays(30);
+
+        $created = [];
+        $skipped = 0;
+
+        foreach ($data['document_ids'] as $documentId) {
+            $exists = TrainingAssignment::where('user_id', $user->id)
+                ->where('document_id', $documentId)
+                ->whereNotIn('status', ['completed', 'failed', 'expired'])
+                ->exists();
+
+            if ($exists) {
+                $skipped++;
+                continue;
+            }
+
+            $assignment = TrainingAssignment::create([
+                'user_id'                  => $user->id,
+                'document_id'              => $documentId,
+                'training_type'            => $data['training_type'],
+                'status'                   => 'pending',
+                'due_date'                 => $dueDate,
+                'required_reading_minutes' => $data['reading_minutes'],
+            ]);
+
+            $assignment->load('document', 'user');
+
+            if ($user->email) {
+                try {
+                    Mail::to($user->email)->queue(new NewTrainingAssigned($assignment));
+                } catch (\Exception $e) {
+                    Log::error('Failed to send assignment email: ' . $e->getMessage());
+                }
+            }
+
+            $created[] = $assignment;
+        }
+
+        if (empty($created)) {
+            return back()->with('info', 'У сотрудника уже есть активные назначения по всем выбранным документам.');
+        }
+
+        if ($data['training_type'] === 'primary') {
+            $this->notifyOokAboutNewEmployee($user, $created[0]);
+        }
+
+        AuditLog::create([
+            'user_id'     => auth()->id(),
+            'user_name'   => auth()->user()->full_name,
+            'action'      => 'create',
+            'model_type'  => 'TrainingAssignment',
+            'model_id'    => $created[0]->id,
+            'new_values'  => $data,
+            'ip_address'  => $request->ip(),
+            'description' => count($created) === 1
+                ? "Назначено обучение «{$created[0]->document->display_name}» сотруднику {$user->full_name}"
+                : 'Назначено обучение (' . count($created) . " документов) сотруднику {$user->full_name}",
+            'created_at'  => now(),
+        ]);
+
+        $message = 'Назначено документов: ' . count($created) . '.';
+        if ($skipped > 0) {
+            $message .= " Пропущено (уже назначено): {$skipped}.";
+        }
+
+        return back()->with('success', $message);
+    }
+
+    private function notifyOokAboutNewEmployee(User $user, TrainingAssignment $assignment): void
+    {
+        $ook = Department::where('short_name', 'ООК')->first();
+        if (!$ook) {
+            return;
+        }
+
+        $recipients = User::active()
+            ->where('department_id', $ook->id)
+            ->whereIn('role', ['manager', 'admin'])
+            ->get();
+
+        if ($ook->manager && !$recipients->contains('id', $ook->manager->id)) {
+            $recipients->push($ook->manager);
+        }
+
+        foreach ($recipients as $recipient) {
+            if (!$recipient->email) {
+                continue;
+            }
+
+            try {
+                Mail::to($recipient->email)->queue(new NewEmployeeInduction($user, $assignment));
+            } catch (\Exception $e) {
+                Log::error('Failed to notify OOK manager about new employee: ' . $e->getMessage());
+            }
+        }
     }
 
     public function edit(User $user)
     {
         return Inertia::render('HR/Users/Form', [
-            'departments' => Department::active()->with('positions')->orderBy('name')->get(),
+            'departments' => Department::active()->with(['positions' => fn($q) => $q->active()->orderBy('name')])->orderBy('name')->get(),
             'managers'    => User::active()->whereIn('role', ['manager', 'admin'])->orderBy('last_name')->get(['id', 'last_name', 'first_name', 'middle_name']),
             'user'        => $user,
         ]);
@@ -156,14 +265,9 @@ class UserController extends Controller
             'hired_at'      => ['nullable', 'date'],
         ]);
 
-        $oldPosition = $user->position_id;
-        $oldValues   = $user->only(array_keys($data));
+        $oldValues = $user->only(array_keys($data));
 
         $user->update($data);
-
-        if ($oldPosition !== $user->position_id && $user->position_id) {
-            $this->assignTrainingByPosition($user);
-        }
 
         AuditLog::create([
             'user_id'     => auth()->id(),
@@ -248,29 +352,15 @@ class UserController extends Controller
             ->with('temp_password', $tempPassword);
     }
 
-    private function assignTrainingByPosition(User $user): void
+    private function positionDocuments(User $user)
     {
-        $matrixItems = TrainingMatrix::active()
-            ->where('position_id', $user->position_id)
-            ->get();
-
-        foreach ($matrixItems as $item) {
-            $exists = TrainingAssignment::where('user_id', $user->id)
-                ->where('document_id', $item->document_id)
-                ->whereNotIn('status', ['expired'])
-                ->exists();
-
-            if (!$exists) {
-                TrainingAssignment::create([
-                    'user_id'                  => $user->id,
-                    'document_id'              => $item->document_id,
-                    'matrix_id'                => $item->id,
-                    'training_type'            => $item->training_type,
-                    'status'                   => 'pending',
-                    'due_date'                 => now()->addDays(30),
-                    'required_reading_minutes' => $item->required_reading_minutes,
-                ]);
-            }
+        if (!$user->position_id) {
+            return collect();
         }
+
+        return Document::active()
+            ->whereIn('id', TrainingMatrix::active()->where('position_id', $user->position_id)->pluck('document_id'))
+            ->orderBy('description')
+            ->get(['id', 'title', 'description']);
     }
 }

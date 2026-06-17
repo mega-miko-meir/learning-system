@@ -19,7 +19,7 @@ td:first-child{color:#64748b;width:45%}
     <p style="color:#374151;font-size:14px">Сотрудник не завершил обязательное обучение в установленный срок.</p>
     <table>
         <tr><td>Сотрудник:</td><td><strong>{{ $assignment->user->full_name }}</strong></td></tr>
-        <tr><td>Документ:</td><td>{{ $assignment->document->title }} (v{{ $assignment->document->version }})</td></tr>
+        <tr><td>Документ:</td><td>{{ $assignment->document->display_name }} (v{{ $assignment->document->version }})</td></tr>
         <tr><td>Срок был:</td><td><strong style="color:#dc2626">{{ $assignment->due_date?->format('d.m.Y') }}</strong></td></tr>
         <tr><td>Просрочено на:</td><td>{{ now()->diffInDays($assignment->due_date) }} дн.</td></tr>
         <tr><td>Отдел:</td><td>{{ $assignment->user->department?->name ?? '—' }}</td></tr>

@@ -13,6 +13,7 @@ const NAV_ITEMS = {
         { href: "admin.tests.index",     icon: "✎", label: "Тесты" },
         { href: "admin.assignments.index", icon: "📋", label: "Назначения" },
         { href: "admin.departments.index", icon: "🏢", label: "Отделы" },
+        { href: "admin.positions.index", icon: "📋", label: "Должности" },
         { href: "admin.reports.index",   icon: "📊", label: "Отчёты" },
         { href: "admin.audit.index",     icon: "🔒", label: "Аудит" },
     ],
@@ -24,6 +25,7 @@ const NAV_ITEMS = {
         { href: "admin.tests.index", icon: "✎", label: "Тесты" },
         { href: "admin.assignments.index", icon: "📋", label: "Назначения" },
         { href: "admin.departments.index", icon: "🏢", label: "Отделы" },
+        { href: "admin.positions.index", icon: "📋", label: "Должности" },
         { href: "admin.reports.index", icon: "📊", label: "Отчёты" },
         { href: "admin.audit.index", icon: "🔒", label: "Аудит" },
     ],
@@ -31,6 +33,7 @@ const NAV_ITEMS = {
         { href: "hr.dashboard", icon: "⊞", label: "Главная" },
         { href: "hr.users.index", icon: "👥", label: "Сотрудники" },
         { href: "hr.departments.index", icon: "🏢", label: "Отделы" },
+        { href: "hr.positions.index", icon: "📋", label: "Должности" },
     ],
     manager: [
         { href: "manager.dashboard", icon: "⊞", label: "Главная" },

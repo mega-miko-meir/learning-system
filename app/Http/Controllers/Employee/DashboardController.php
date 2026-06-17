@@ -27,7 +27,7 @@ class DashboardController extends Controller
             ->get()
             ->map(fn($a) => [
                 'id'       => $a->id,
-                'document' => $a->document->title,
+                'document' => $a->document->display_name,
                 'type'     => $a->training_type,
                 'status'   => $a->status,
                 'due_date' => $a->due_date?->format('d.m.Y'),

@@ -16,6 +16,124 @@ const ROLE_LABELS = {
     manager: "Руководитель", employee: "Сотрудник",
 };
 
+const TRAINING_TYPES = [
+    { value: "primary",   label: "Первичный инструктаж" },
+    { value: "periodic",  label: "Периодическое" },
+    { value: "unplanned", label: "Внеплановое" },
+    { value: "special",   label: "Специальное" },
+];
+
+const READING_MINUTES = [5, 10, 15, 20, 30, 45, 60];
+
+function CreateAssignmentModal({ employeeId, documents, onClose }) {
+    const [documentIds, setDocumentIds] = useState([]);
+    const [trainingType, setTrainingType] = useState("primary");
+    const [readingMinutes, setReadingMinutes] = useState(10);
+    const [search, setSearch] = useState("");
+    const [submitting, setSubmitting] = useState(false);
+
+    const filtered = documents.filter((d) =>
+        (d.description ?? d.title ?? "").toLowerCase().includes(search.toLowerCase())
+    );
+    const allFilteredSelected = filtered.length > 0 && filtered.every((d) => documentIds.includes(d.id));
+
+    function toggle(id) {
+        setDocumentIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+    }
+
+    function toggleAll() {
+        if (allFilteredSelected) {
+            setDocumentIds((prev) => prev.filter((id) => !filtered.some((d) => d.id === id)));
+        } else {
+            setDocumentIds((prev) => [...new Set([...prev, ...filtered.map((d) => d.id)])]);
+        }
+    }
+
+    function submit(e) {
+        e.preventDefault();
+        setSubmitting(true);
+        router.post(route("admin.users.assignments.store", employeeId), {
+            document_ids: documentIds,
+            training_type: trainingType,
+            reading_minutes: readingMinutes,
+        }, {
+            onFinish: () => setSubmitting(false),
+            onSuccess: onClose,
+        });
+    }
+
+    return (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4 shadow-xl max-h-[90vh] flex flex-col">
+                <h3 className="text-base font-semibold text-gray-900 mb-4">Создать обучение</h3>
+                <form onSubmit={submit} className="space-y-4 flex-1 flex flex-col min-h-0">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Вид обучения</label>
+                        <select value={trainingType} onChange={(e) => setTrainingType(e.target.value)}
+                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            {TRAINING_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                        </select>
+                        {trainingType === "primary" && (
+                            <p className="mt-1 text-xs text-gray-400">Срок — сегодня (день в день с оформлением).</p>
+                        )}
+                    </div>
+
+                    <div className="flex-1 min-h-0 flex flex-col">
+                        <div className="flex items-center justify-between mb-1.5">
+                            <label className="block text-sm font-medium text-gray-700">
+                                Документы {documentIds.length > 0 && `(выбрано: ${documentIds.length})`}
+                            </label>
+                            <button type="button" onClick={toggleAll} className="text-xs text-blue-600 hover:underline">
+                                {allFilteredSelected ? "Снять все" : "Выбрать все"}
+                            </button>
+                        </div>
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Поиск документа..."
+                            className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <div className="border border-gray-200 rounded-lg overflow-y-auto flex-1 min-h-[160px] max-h-60">
+                            {filtered.length === 0 ? (
+                                <p className="px-3 py-4 text-sm text-gray-400 text-center">Документы не найдены</p>
+                            ) : filtered.map((d) => (
+                                <label key={d.id} className="flex items-center gap-2 px-3 py-2 text-sm border-b border-gray-50 last:border-0 hover:bg-gray-50 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={documentIds.includes(d.id)}
+                                        onChange={() => toggle(d.id)}
+                                        className="w-4 h-4 accent-blue-600 shrink-0"
+                                    />
+                                    <span className="text-gray-700">{d.description ?? d.title}</span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Время на изучение (мин)</label>
+                        <select value={readingMinutes} onChange={(e) => setReadingMinutes(Number(e.target.value))}
+                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            {READING_MINUTES.map((m) => <option key={m} value={m}>{m}</option>)}
+                        </select>
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                        <button type="submit" disabled={submitting || documentIds.length === 0}
+                            className="flex-1 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                            {submitting ? "Создаём..." : `Создать${documentIds.length > 1 ? ` (${documentIds.length})` : ""}`}
+                        </button>
+                        <button type="button" onClick={onClose}
+                            className="flex-1 px-4 py-2 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">
+                            Отмена
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
 function TempPasswordModal({ title, password, employee, onClose }) {
     const [copiedAll, setCopiedAll] = useState(false);
 
@@ -162,13 +280,14 @@ function AttemptDetail({ attempt }) {
     );
 }
 
-export default function UserShow({ employee, assignments }) {
+export default function UserShow({ employee, assignments, documents }) {
     const { data, setData, post, processing } = useForm({ fired_at: "" });
     const flash = useFlash();
 
     const [tempPassword, setTempPassword]             = useState(null);
     const [showPasswordModal, setShowPasswordModal]   = useState(false);
     const [showResetModal, setShowResetModal]          = useState(false);
+    const [showAssignModal, setShowAssignModal]        = useState(false);
     const [passwordModalTitle, setPasswordModalTitle] = useState("");
     const [openAttempts, setOpenAttempts]             = useState({});
 
@@ -225,6 +344,14 @@ export default function UserShow({ employee, assignments }) {
                 <ResetPasswordModal
                     onConfirm={submitReset}
                     onClose={() => setShowResetModal(false)}
+                />
+            )}
+
+            {showAssignModal && (
+                <CreateAssignmentModal
+                    employeeId={employee.id}
+                    documents={documents}
+                    onClose={() => setShowAssignModal(false)}
                 />
             )}
 
@@ -315,6 +442,15 @@ export default function UserShow({ employee, assignments }) {
 
                 {/* Назначения */}
                 <div className="lg:col-span-2 space-y-3">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-sm font-semibold text-gray-700">Назначения обучения</h2>
+                        <button
+                            onClick={() => setShowAssignModal(true)}
+                            className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700"
+                        >
+                            + Создать обучение
+                        </button>
+                    </div>
                     {assignments.length === 0 ? (
                         <div className="bg-white rounded-xl border border-gray-100 p-8 text-center text-gray-400 text-sm">
                             Назначений нет

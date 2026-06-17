@@ -31,7 +31,7 @@ class DashboardController extends Controller
             ->map(fn($a) => [
                 'id'         => $a->id,
                 'user'       => $a->user->short_name,
-                'document'   => $a->document->title,
+                'document'   => $a->document->display_name,
                 'status'     => $a->status,
                 'updated_at' => $a->updated_at->format('d.m.Y H:i'),
             ]);

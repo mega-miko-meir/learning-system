@@ -15,14 +15,22 @@ td:first-child{color:#64748b;width:45%}
 <body>
 <div class="card">
     <div class="header">📋 Новое задание на обучение</div>
-    <div class="badge">{{ \App\Models\TrainingAssignment::$trainingTypeLabels[$assignment->training_type] ?? $assignment->training_type }}</div>
+    @php
+        $trainingTypeLabels = [
+            'primary'   => 'Первичное',
+            'periodic'  => 'Периодическое',
+            'unplanned' => 'Внеплановое',
+            'special'   => 'Специальное',
+        ];
+    @endphp
+    <div class="badge">{{ $trainingTypeLabels[$assignment->training_type] ?? $assignment->training_type }}</div>
     <p style="color:#374151;font-size:15px">Здравствуйте, <strong>{{ $assignment->user->full_name }}</strong>!</p>
     <p style="color:#374151;font-size:14px">Вам назначено обучение по следующему документу:</p>
     <table>
-        <tr><td>Документ:</td><td><strong>{{ $assignment->document->title }}</strong></td></tr>
+        <tr><td>Документ:</td><td><strong>{{ $assignment->document->display_name }}</strong></td></tr>
         <tr><td>Версия:</td><td>v{{ $assignment->document->version }}</td></tr>
         <tr><td>Срок выполнения:</td><td><strong>{{ $assignment->due_date?->format('d.m.Y') ?? 'Не указан' }}</strong></td></tr>
-        <tr><td>Вид обучения:</td><td>{{ $assignment->training_type }}</td></tr>
+        <tr><td>Вид обучения:</td><td>{{ $trainingTypeLabels[$assignment->training_type] ?? $assignment->training_type }}</td></tr>
     </table>
     <p style="color:#374151;font-size:14px">Для прохождения обучения войдите в систему через телефон и временный пароль.</p>
     <div class="footer">Система обучения персонала · Автоматическое уведомление</div>

@@ -18,7 +18,7 @@ class TrainingOverdue extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'ПРОСРОЧЕНО: Обучение по «' . $this->assignment->document->title . '» — ' . $this->assignment->user->full_name,
+            subject: 'ПРОСРОЧЕНО: Обучение по «' . $this->assignment->document->display_name . '» — ' . $this->assignment->user->full_name,
         );
     }
 

@@ -170,7 +170,7 @@ export default function MatrixIndex({ matrix, positions, documents }) {
                                 >
                                     <option value="">— Выберите —</option>
                                     {documents.map((d) => (
-                                        <option key={d.id} value={d.id}>{d.title}</option>
+                                        <option key={d.id} value={d.id}>{d.description}</option>
                                     ))}
                                 </select>
                                 {errors.document_id && <p className="mt-1 text-xs text-red-600">{errors.document_id}</p>}

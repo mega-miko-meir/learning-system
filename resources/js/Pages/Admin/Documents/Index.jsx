@@ -33,7 +33,7 @@ export default function DocumentsIndex({ documents }) {
                     <input
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Поиск по названию..."
+                        placeholder="Поиск по коду или названию..."
                         className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-56"
                     />
                     <button className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm hover:border-gray-300">
@@ -69,8 +69,9 @@ export default function DocumentsIndex({ documents }) {
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b border-gray-100">
                         <tr>
-                            <th className="text-left px-4 py-3 font-medium text-gray-600">Название</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Тип</th>
+                            <th className="text-left px-4 py-3 font-medium text-gray-600">Код</th>
+                            <th className="text-left px-4 py-3 font-medium text-gray-600">Название</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Версия</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Тест</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Добавлен</th>
@@ -81,15 +82,16 @@ export default function DocumentsIndex({ documents }) {
                     <tbody className="divide-y divide-gray-50">
                         {documents.data.length === 0 ? (
                             <tr>
-                                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
+                                <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
                                     Документов нет
                                 </td>
                             </tr>
                         ) : (
                             documents.data.map((d) => (
                                 <tr key={d.id} className={`hover:bg-gray-50 ${!d.has_test ? "bg-orange-50/40" : ""}`}>
-                                    <td className="px-4 py-3 font-medium text-gray-900">{d.title}</td>
                                     <td className="px-4 py-3 text-gray-500">{d.type}</td>
+                                    <td className="px-4 py-3 text-gray-500">{d.title}</td>
+                                    <td className="px-4 py-3 font-medium text-gray-900">{d.description}</td>
                                     <td className="px-4 py-3 text-gray-500">v{d.version}</td>
                                     <td className="px-4 py-3">
                                         {d.has_test ? (

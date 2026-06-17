@@ -9,7 +9,7 @@ class Department extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'manager_id', 'is_active'];
+    protected $fillable = ['name', 'code', 'short_name', 'manager_id', 'is_active'];
 
     protected function casts(): array
     {

@@ -14,9 +14,18 @@ class Document extends Model
         'version', 'is_active', 'uploaded_by',
     ];
 
+    protected $appends = ['display_name'];
+
     protected function casts(): array
     {
         return ['is_active' => 'boolean'];
+    }
+
+    // Название документа (description) — основное отображаемое имя везде в системе.
+    // Код документа (title) используется как запасной вариант для старых записей без названия.
+    public function getDisplayNameAttribute(): string
+    {
+        return $this->description ?: $this->title;
     }
 
     public function test()

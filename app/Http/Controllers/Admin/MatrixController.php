@@ -24,14 +24,14 @@ class MatrixController extends Controller
                 'id'                       => $m->id,
                 'position'                 => $m->position->name,
                 'department'               => $m->position->department?->name,
-                'document'                 => $m->document->title,
+                'document'                 => $m->document->display_name,
                 'training_type'            => $m->training_type,
                 'is_mandatory'             => $m->is_mandatory,
                 'required_reading_minutes' => $m->required_reading_minutes,
             ]);
 
         $positions = Position::active()->with('department')->orderBy('name')->get(['id', 'name', 'department_id']);
-        $documents = Document::active()->orderBy('title')->get(['id', 'title']);
+        $documents = Document::active()->orderBy('description')->get(['id', 'title', 'description']);
 
         return Inertia::render('Admin/Matrix/Index', compact('matrix', 'positions', 'documents'));
     }

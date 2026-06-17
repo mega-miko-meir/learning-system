@@ -18,7 +18,7 @@ class NewTrainingAssigned extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Новое задание на обучение: ' . $this->assignment->document->title,
+            subject: 'Новое задание на обучение: ' . $this->assignment->document->display_name,
         );
     }
 

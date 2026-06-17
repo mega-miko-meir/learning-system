@@ -22,7 +22,7 @@ class TestController extends Controller
             ->through(fn($t) => [
                 'id'              => $t->id,
                 'title'           => $t->title,
-                'document'        => $t->document?->title,
+                'document'        => $t->document?->display_name,
                 'questions_count' => $t->questions()->where('is_active', true)->count(),
                 'passing_score'   => $t->passing_score,
                 'is_active'       => $t->is_active,
@@ -33,7 +33,7 @@ class TestController extends Controller
 
     public function create(Request $request)
     {
-        $documents = Document::active()->orderBy('title')->get(['id', 'title']);
+        $documents = Document::active()->orderBy('description')->get(['id', 'title', 'description', 'type', 'version']);
 
         return Inertia::render('Admin/Tests/Create', [
             'documents'   => $documents,
@@ -104,7 +104,7 @@ class TestController extends Controller
             'questions' => fn($q) => $q->where('is_active', true)->orderBy('order_number'),
             'questions.answers',
         ]);
-        $documents = Document::active()->orderBy('title')->get(['id', 'title']);
+        $documents = Document::active()->orderBy('description')->get(['id', 'title', 'description', 'type', 'version']);
 
         return Inertia::render('Admin/Tests/Create', [
             'documents'   => $documents,

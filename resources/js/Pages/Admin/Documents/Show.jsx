@@ -12,20 +12,20 @@ export default function DocumentShow({ document: doc, test }) {
     }
 
     function deactivate() {
-        if (confirm(`Деактивировать документ «${doc.title}»?`)) {
+        if (confirm(`Деактивировать документ «${doc.display_name}»?`)) {
             router.delete(route("admin.documents.destroy", doc.id));
         }
     }
 
     function deleteDocument() {
-        if (confirm(`Удалить документ «${doc.title}» навсегда?\n\nБудут удалены: тест, вопросы, назначения обучения и все результаты тестов. Это действие нельзя отменить.`)) {
+        if (confirm(`Удалить документ «${doc.display_name}» навсегда?\n\nБудут удалены: тест, вопросы, назначения обучения и все результаты тестов. Это действие нельзя отменить.`)) {
             router.delete(route("admin.documents.force-delete", doc.id));
         }
     }
 
     return (
-        <AppLayout title={doc.title}>
-            <Head title={doc.title} />
+        <AppLayout title={doc.display_name}>
+            <Head title={doc.display_name} />
 
             <p className="text-xs text-gray-400 mb-6">
                 <Link href={route("admin.documents.index")} className="hover:underline">
@@ -40,23 +40,21 @@ export default function DocumentShow({ document: doc, test }) {
                         <h2 className="text-sm font-semibold text-gray-700 mb-4">Информация</h2>
                         <dl className="space-y-3 text-sm">
                             <div>
-                                <dt className="text-gray-400 text-xs">Название</dt>
+                                <dt className="text-gray-400 text-xs">Тип документа</dt>
+                                <dd className="text-gray-700">{doc.type}</dd>
+                            </div>
+                            <div>
+                                <dt className="text-gray-400 text-xs">Код документа</dt>
                                 <dd className="text-gray-900 font-medium">{doc.title}</dd>
                             </div>
                             <div>
-                                <dt className="text-gray-400 text-xs">Тип</dt>
-                                <dd className="text-gray-700">{doc.type}</dd>
+                                <dt className="text-gray-400 text-xs">Название документа</dt>
+                                <dd className="text-gray-900 font-medium">{doc.description}</dd>
                             </div>
                             <div>
                                 <dt className="text-gray-400 text-xs">Версия</dt>
                                 <dd className="text-gray-700 font-mono">v{doc.version}</dd>
                             </div>
-                            {doc.description && (
-                                <div>
-                                    <dt className="text-gray-400 text-xs">Описание</dt>
-                                    <dd className="text-gray-700">{doc.description}</dd>
-                                </div>
-                            )}
                             <div>
                                 <dt className="text-gray-400 text-xs">Статус</dt>
                                 <dd>
@@ -159,7 +157,7 @@ export default function DocumentShow({ document: doc, test }) {
                      style={{ height: "calc(100vh - 200px)" }}>
                     <iframe
                         src={route("documents.view", doc.id)}
-                        title={doc.title}
+                        title={doc.display_name}
                         className="w-full h-full border-0"
                     />
                 </div>

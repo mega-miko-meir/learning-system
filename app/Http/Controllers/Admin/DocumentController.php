@@ -15,7 +15,10 @@ class DocumentController extends Controller
     {
         $documents = Document::withExists('test')
             ->when($request->search, fn($q, $s) =>
-                $q->where('title', 'like', "%$s%")
+                $q->where(fn($q) =>
+                    $q->where('title', 'like', "%$s%")
+                      ->orWhere('description', 'like', "%$s%")
+                )
             )
             ->when($request->no_test, fn($q) =>
                 $q->whereDoesntHave('test')
@@ -24,13 +27,14 @@ class DocumentController extends Controller
             ->paginate(20)
             ->withQueryString()
             ->through(fn($d) => [
-                'id'         => $d->id,
-                'title'      => $d->title,
-                'type'       => $d->type,
-                'version'    => $d->version,
-                'is_active'  => $d->is_active,
-                'has_test'   => $d->test_exists,
-                'created_at' => $d->created_at->format('d.m.Y'),
+                'id'          => $d->id,
+                'title'       => $d->title,
+                'description' => $d->description,
+                'type'        => $d->type,
+                'version'     => $d->version,
+                'is_active'   => $d->is_active,
+                'has_test'    => $d->test_exists,
+                'created_at'  => $d->created_at->format('d.m.Y'),
             ]);
 
         return Inertia::render('Admin/Documents/Index', compact('documents'));
@@ -46,7 +50,8 @@ class DocumentController extends Controller
         $data = $request->validate([
             'title'       => ['required', 'string', 'max:255'],
             'type'        => ['required', 'string'],
-            'description' => ['nullable', 'string'],
+            'description' => ['required', 'string'],
+            'version'     => ['required', 'integer', 'min:1', 'max:255'],
             'file'        => ['required', 'file', 'mimes:pdf,doc,docx', 'max:20480'],
         ]);
 
@@ -55,9 +60,9 @@ class DocumentController extends Controller
         $document = Document::create([
             'title'       => $data['title'],
             'type'        => $data['type'],
-            'description' => $data['description'] ?? null,
+            'description' => $data['description'],
             'file_path'   => $path,
-            'version'     => 1,
+            'version'     => $data['version'],
             'is_active'   => true,
             'uploaded_by' => auth()->id(),
         ]);
@@ -69,7 +74,7 @@ class DocumentController extends Controller
             'model_type'  => 'Document',
             'model_id'    => $document->id,
             'ip_address'  => $request->ip(),
-            'description' => "Загружен документ: {$document->title}",
+            'description' => "Загружен документ: {$document->display_name}",
             'created_at'  => now(),
         ]);
 
@@ -100,7 +105,8 @@ class DocumentController extends Controller
         $data = $request->validate([
             'title'       => ['required', 'string', 'max:255'],
             'type'        => ['required', 'string'],
-            'description' => ['nullable', 'string'],
+            'description' => ['required', 'string'],
+            'version'     => ['required', 'integer', 'min:1', 'max:255'],
             'is_active'   => ['boolean'],
         ]);
 
@@ -113,7 +119,7 @@ class DocumentController extends Controller
             'model_type'  => 'Document',
             'model_id'    => $document->id,
             'ip_address'  => $request->ip(),
-            'description' => "Обновлён документ: {$document->title}",
+            'description' => "Обновлён документ: {$document->display_name}",
             'created_at'  => now(),
         ]);
 
@@ -132,7 +138,7 @@ class DocumentController extends Controller
             'model_type'  => 'Document',
             'model_id'    => $document->id,
             'ip_address'  => request()->ip(),
-            'description' => "Деактивирован документ: {$document->title}",
+            'description' => "Деактивирован документ: {$document->display_name}",
             'created_at'  => now(),
         ]);
 
@@ -141,7 +147,7 @@ class DocumentController extends Controller
 
     public function forceDestroy(Document $document)
     {
-        $title = $document->title;
+        $title = $document->display_name;
         $id    = $document->id;
 
         // Каскадное удаление через onDelete('cascade') в БД:
@@ -201,7 +207,7 @@ class DocumentController extends Controller
             'model_type'  => 'Document',
             'model_id'    => $document->id,
             'ip_address'  => $request->ip(),
-            'description' => "Загружена новая версия документа: {$document->title} (v{$document->version}). Переназначено обучений: {$reassigned->count()}",
+            'description' => "Загружена новая версия документа: {$document->display_name} (v{$document->version}). Переназначено обучений: {$reassigned->count()}",
             'created_at'  => now(),
         ]);
 

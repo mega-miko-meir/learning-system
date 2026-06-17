@@ -23,7 +23,7 @@ td:first-child{color:#64748b;width:45%}
         <p style="color:#374151;font-size:14px">Напоминаем, что до срока прохождения обучения осталось <strong>7 дней</strong>.</p>
     @endif
     <table>
-        <tr><td>Документ:</td><td><strong>{{ $assignment->document->title }}</strong></td></tr>
+        <tr><td>Документ:</td><td><strong>{{ $assignment->document->display_name }}</strong></td></tr>
         @if($recipientType === 'manager')
         <tr><td>Сотрудник:</td><td>{{ $assignment->user->full_name }}</td></tr>
         @endif
