@@ -92,90 +92,129 @@ function ApplyMatrixButton() {
     );
 }
 
-function AddForm({ positions, documents, matrix, departments }) {
-    const [departmentId,     setDepartmentId]     = useState("");
-    const [positionId,       setPositionId]       = useState("");
-    const [selectedDocIds,   setSelectedDocIds]   = useState([]);
-    const [trainingType,     setTrainingType]      = useState("primary");
-    const [readingMinutes,   setReadingMinutes]   = useState(10);
-    const [isMandatory,      setIsMandatory]      = useState(true);
-    const [docSearch,        setDocSearch]        = useState("");
-    const [saving,           setSaving]           = useState(false);
-    const [errors,           setErrors]           = useState({});
-
-    const filteredPositions = useMemo(() =>
-        departmentId
-            ? positions.filter((p) => p.department_id === Number(departmentId))
-            : positions,
-        [departmentId, positions]
+function CheckboxList({ items, selectedIds, onToggle, onToggleAll, search, onSearch, searchPlaceholder, renderItem, emptyText, error }) {
+    const allSelected = items.length > 0 && items.every((i) => selectedIds.includes(i.id));
+    return (
+        <div>
+            <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-medium text-gray-600">
+                    {selectedIds.length > 0 && (
+                        <span className="text-blue-600">({selectedIds.length} выбрано)</span>
+                    )}
+                </span>
+                {items.length > 0 && (
+                    <button type="button" onClick={() => onToggleAll(allSelected, items)}
+                        className="text-xs text-blue-500 hover:text-blue-700">
+                        {allSelected ? "Снять все" : "Выбрать все"}
+                    </button>
+                )}
+            </div>
+            <input type="text" value={search} onChange={(e) => onSearch(e.target.value)}
+                placeholder={searchPlaceholder}
+                className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            {items.length === 0 ? (
+                <p className="text-xs text-gray-400 py-2 text-center">{search ? "Ничего не найдено" : emptyText}</p>
+            ) : (
+                <div className={`border rounded-lg overflow-hidden max-h-44 overflow-y-auto ${error ? "border-red-300" : "border-gray-200"}`}>
+                    {items.map((item) => (
+                        <label key={item.id}
+                            className={`flex items-start gap-2.5 px-3 py-2 cursor-pointer hover:bg-gray-50 text-sm border-b border-gray-100 last:border-0 ${selectedIds.includes(item.id) ? "bg-blue-50" : ""}`}>
+                            <input type="checkbox" checked={selectedIds.includes(item.id)}
+                                onChange={() => onToggle(item.id)}
+                                className="mt-0.5 w-4 h-4 accent-blue-600 shrink-0" />
+                            <span className="leading-tight">{renderItem(item)}</span>
+                        </label>
+                    ))}
+                </div>
+            )}
+            {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+        </div>
     );
+}
+
+function AddForm({ positions, documents, departments }) {
+    const [departmentId,     setDepartmentId]   = useState("");
+    const [selectedPosIds,   setSelectedPosIds] = useState([]);
+    const [selectedDocIds,   setSelectedDocIds] = useState([]);
+    const [trainingType,     setTrainingType]   = useState("primary");
+    const [readingMinutes,   setReadingMinutes] = useState(10);
+    const [isMandatory,      setIsMandatory]    = useState(true);
+    const [posSearch,        setPosSearch]      = useState("");
+    const [docSearch,        setDocSearch]      = useState("");
+    const [saving,           setSaving]         = useState(false);
+    const [errors,           setErrors]         = useState({});
 
     function handleDepartmentChange(id) {
         setDepartmentId(id);
-        setPositionId("");
-        setSelectedDocIds([]);
-        setDocSearch("");
+        setSelectedPosIds([]);
+        setPosSearch("");
     }
 
-    const existingDocIds = useMemo(() => {
-        if (!positionId) return new Set();
-        return new Set(matrix.filter((m) => m.position_id === Number(positionId)).map((m) => m.document_id));
-    }, [positionId, matrix]);
+    const availablePositions = useMemo(() => {
+        const base = departmentId
+            ? positions.filter((p) => p.department_id === Number(departmentId))
+            : positions;
+        return base.filter((p) =>
+            !posSearch.trim() || p.name.toLowerCase().includes(posSearch.toLowerCase())
+        );
+    }, [positions, departmentId, posSearch]);
 
     const availableDocs = useMemo(() => {
-        return documents
-            .filter((d) => !existingDocIds.has(d.id))
-            .filter((d) =>
-                !docSearch.trim() ||
-                d.description.toLowerCase().includes(docSearch.toLowerCase()) ||
-                d.title.toLowerCase().includes(docSearch.toLowerCase())
-            );
-    }, [documents, existingDocIds, docSearch]);
+        return documents.filter((d) =>
+            !docSearch.trim() ||
+            d.description.toLowerCase().includes(docSearch.toLowerCase()) ||
+            d.title.toLowerCase().includes(docSearch.toLowerCase())
+        );
+    }, [documents, docSearch]);
 
-    const allSelected = availableDocs.length > 0 && availableDocs.every((d) => selectedDocIds.includes(d.id));
+    function togglePos(id) {
+        setSelectedPosIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+    }
+
+    function toggleAllPos(allSelected, items) {
+        setSelectedPosIds(allSelected ? [] : items.map((i) => i.id));
+    }
 
     function toggleDoc(id) {
         setSelectedDocIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
     }
 
-    function toggleAll() {
-        setSelectedDocIds(allSelected ? [] : availableDocs.map((d) => d.id));
-    }
-
-    function handlePositionChange(id) {
-        setPositionId(id);
-        setSelectedDocIds([]);
-        setDocSearch("");
+    function toggleAllDoc(allSelected, items) {
+        setSelectedDocIds(allSelected ? [] : items.map((i) => i.id));
     }
 
     function submit(e) {
         e.preventDefault();
         setErrors({});
-        if (!positionId) { setErrors({ position_id: "Выберите должность" }); return; }
-        if (selectedDocIds.length === 0) { setErrors({ document_ids: "Выберите хотя бы один документ" }); return; }
+        const errs = {};
+        if (selectedPosIds.length === 0) errs.position_ids = "Выберите хотя бы одну должность";
+        if (selectedDocIds.length === 0) errs.document_ids = "Выберите хотя бы один документ";
+        if (Object.keys(errs).length) { setErrors(errs); return; }
 
         setSaving(true);
         router.post(route("admin.matrix.store"), {
-            position_id:              positionId,
+            position_ids:             selectedPosIds,
             document_ids:             selectedDocIds,
             training_type:            trainingType,
             is_mandatory:             isMandatory,
             required_reading_minutes: readingMinutes,
         }, {
             preserveScroll: true,
-            onSuccess: () => { setSelectedDocIds([]); setDocSearch(""); },
+            onSuccess: () => { setSelectedPosIds([]); setSelectedDocIds([]); setPosSearch(""); setDocSearch(""); },
             onError: setErrors,
             onFinish: () => setSaving(false),
         });
     }
 
+    const total = selectedPosIds.length * selectedDocIds.length;
+
     return (
         <div className="bg-white rounded-xl border border-gray-100 p-5 sticky top-6">
-            <h2 className="text-sm font-semibold text-gray-700 mb-4">Добавить документы в матрицу</h2>
+            <h2 className="text-sm font-semibold text-gray-700 mb-4">Добавить записи в матрицу</h2>
 
             <form onSubmit={submit} className="space-y-4">
                 <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Отдел</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Отдел (фильтр)</label>
                     <select value={departmentId} onChange={(e) => handleDepartmentChange(e.target.value)}
                         className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <option value="">— Все отделы —</option>
@@ -184,59 +223,45 @@ function AddForm({ positions, documents, matrix, departments }) {
                 </div>
 
                 <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Должность *</label>
-                    <select value={positionId} onChange={(e) => handlePositionChange(e.target.value)}
-                        className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.position_id ? "border-red-300" : "border-gray-200"}`}>
-                        <option value="">— Выберите должность —</option>
-                        {filteredPositions.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
-                    {errors.position_id && <p className="mt-1 text-xs text-red-600">{errors.position_id}</p>}
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Должности *{selectedPosIds.length > 0 && <span className="ml-1 text-blue-600">({selectedPosIds.length})</span>}
+                    </label>
+                    <CheckboxList
+                        items={availablePositions}
+                        selectedIds={selectedPosIds}
+                        onToggle={togglePos}
+                        onToggleAll={toggleAllPos}
+                        search={posSearch}
+                        onSearch={setPosSearch}
+                        searchPlaceholder="Поиск должности..."
+                        renderItem={(p) => <span className="font-medium text-gray-800">{p.name}</span>}
+                        emptyText="Нет должностей"
+                        error={errors.position_ids}
+                    />
                 </div>
 
-                {positionId && (
-                    <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                            <label className="text-xs font-medium text-gray-600">
-                                Документы *
-                                {selectedDocIds.length > 0 && (
-                                    <span className="ml-1.5 text-blue-600">({selectedDocIds.length} выбрано)</span>
-                                )}
-                            </label>
-                            {availableDocs.length > 0 && (
-                                <button type="button" onClick={toggleAll}
-                                    className="text-xs text-blue-500 hover:text-blue-700">
-                                    {allSelected ? "Снять все" : "Выбрать все"}
-                                </button>
-                            )}
-                        </div>
-
-                        <input type="text" value={docSearch} onChange={(e) => setDocSearch(e.target.value)}
-                            placeholder="Поиск документа..."
-                            className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-
-                        {availableDocs.length === 0 ? (
-                            <p className="text-xs text-gray-400 py-2 text-center">
-                                {docSearch ? "Ничего не найдено" : "Все документы уже добавлены для этой должности"}
-                            </p>
-                        ) : (
-                            <div className="border border-gray-200 rounded-lg overflow-hidden max-h-52 overflow-y-auto">
-                                {availableDocs.map((d) => (
-                                    <label key={d.id}
-                                        className={`flex items-start gap-2.5 px-3 py-2 cursor-pointer hover:bg-gray-50 text-sm border-b border-gray-100 last:border-0 ${selectedDocIds.includes(d.id) ? "bg-blue-50" : ""}`}>
-                                        <input type="checkbox" checked={selectedDocIds.includes(d.id)}
-                                            onChange={() => toggleDoc(d.id)}
-                                            className="mt-0.5 w-4 h-4 accent-blue-600 shrink-0" />
-                                        <span className="leading-tight">
-                                            <span className="font-medium text-gray-800">{d.title}</span>
-                                            <span className="block text-xs text-gray-400">{d.description}</span>
-                                        </span>
-                                    </label>
-                                ))}
-                            </div>
+                <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Документы *{selectedDocIds.length > 0 && <span className="ml-1 text-blue-600">({selectedDocIds.length})</span>}
+                    </label>
+                    <CheckboxList
+                        items={availableDocs}
+                        selectedIds={selectedDocIds}
+                        onToggle={toggleDoc}
+                        onToggleAll={toggleAllDoc}
+                        search={docSearch}
+                        onSearch={setDocSearch}
+                        searchPlaceholder="Поиск документа..."
+                        renderItem={(d) => (
+                            <>
+                                <span className="font-medium text-gray-800">{d.title}</span>
+                                <span className="block text-xs text-gray-400">{d.description}</span>
+                            </>
                         )}
-                        {errors.document_ids && <p className="mt-1 text-xs text-red-600">{errors.document_ids}</p>}
-                    </div>
-                )}
+                        emptyText="Нет документов"
+                        error={errors.document_ids}
+                    />
+                </div>
 
                 <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Вид обучения</label>
@@ -259,13 +284,13 @@ function AddForm({ positions, documents, matrix, departments }) {
                     Обязательное
                 </label>
 
-                <button type="submit" disabled={saving || selectedDocIds.length === 0}
+                <button type="submit" disabled={saving || total === 0}
                     className="w-full px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
                     {saving
                         ? "Добавляем..."
-                        : selectedDocIds.length > 0
-                            ? `Добавить ${selectedDocIds.length} документ${selectedDocIds.length > 1 ? "а" : ""}`
-                            : "Выберите документы"}
+                        : total > 0
+                            ? `Добавить ${total} запис${total === 1 ? "ь" : total < 5 ? "и" : "ей"}`
+                            : "Выберите должности и документы"}
                 </button>
             </form>
         </div>
@@ -314,7 +339,7 @@ export default function MatrixIndex({ matrix, positions, documents, departments 
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-1">
-                    <AddForm positions={positions} documents={documents} matrix={matrix} departments={departments} />
+                    <AddForm positions={positions} documents={documents} departments={departments} />
                 </div>
 
                 <div className="lg:col-span-2">

@@ -43,7 +43,8 @@ class MatrixController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'position_id'              => ['required', 'exists:positions,id'],
+            'position_ids'             => ['required', 'array', 'min:1'],
+            'position_ids.*'           => ['exists:positions,id'],
             'document_ids'             => ['required', 'array', 'min:1'],
             'document_ids.*'           => ['exists:documents,id'],
             'training_type'            => ['required', Rule::in(['primary', 'periodic', 'unplanned', 'special'])],
@@ -52,14 +53,10 @@ class MatrixController extends Controller
         ]);
 
         $created = 0;
-        foreach ($data['document_ids'] as $documentId) {
-            $existed = TrainingMatrix::where('position_id', $data['position_id'])
-                ->where('document_id', $documentId)
-                ->exists();
-
-            if (!$existed) {
+        foreach ($data['position_ids'] as $positionId) {
+            foreach ($data['document_ids'] as $documentId) {
                 TrainingMatrix::create([
-                    'position_id'              => $data['position_id'],
+                    'position_id'              => $positionId,
                     'document_id'              => $documentId,
                     'training_type'            => $data['training_type'],
                     'is_mandatory'             => $data['is_mandatory'] ?? false,
@@ -70,13 +67,7 @@ class MatrixController extends Controller
             }
         }
 
-        $skipped = count($data['document_ids']) - $created;
-        $message = "Добавлено в матрицу: {$created} документов.";
-        if ($skipped > 0) {
-            $message .= " Пропущено (уже есть): {$skipped}.";
-        }
-
-        return back()->with('success', $message);
+        return back()->with('success', "Добавлено в матрицу: {$created} записей.");
     }
 
     public function update(Request $request, TrainingMatrix $matrix)
