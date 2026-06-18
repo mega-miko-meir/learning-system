@@ -54,8 +54,19 @@ class MatrixController extends Controller
         ]);
 
         $created = 0;
+        $skipped = 0;
         foreach ($data['position_ids'] as $positionId) {
             foreach ($data['document_ids'] as $documentId) {
+                $exists = TrainingMatrix::where('position_id', $positionId)
+                    ->where('document_id', $documentId)
+                    ->where('is_active', true)
+                    ->exists();
+
+                if ($exists) {
+                    $skipped++;
+                    continue;
+                }
+
                 TrainingMatrix::create([
                     'position_id'              => $positionId,
                     'document_id'              => $documentId,
@@ -68,7 +79,12 @@ class MatrixController extends Controller
             }
         }
 
-        return back()->with('success', "Добавлено в матрицу: {$created} записей.");
+        $message = "Добавлено в матрицу: {$created} записей.";
+        if ($skipped > 0) {
+            $message .= " Пропущено дублей: {$skipped}.";
+        }
+
+        return back()->with('success', $message);
     }
 
     public function update(Request $request, TrainingMatrix $matrix)
