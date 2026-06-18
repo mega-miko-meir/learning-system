@@ -12,14 +12,22 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // MySQL uses the unique composite index to enforce the position_id FK.
-        // We must add a standalone index on position_id first so MySQL has
-        // another index to fall back to before we drop the unique constraint.
-        Schema::table('training_matrix', function (Blueprint $table) {
-            $table->index('position_id', 'tm_position_id_idx');
-        });
+        $indexes = collect(DB::select("SHOW INDEX FROM training_matrix"))->pluck('Key_name');
 
-        DB::statement('ALTER TABLE training_matrix DROP INDEX IF EXISTS training_matrix_position_id_document_id_unique');
+        // MySQL uses the unique composite index to enforce the position_id FK.
+        // Add a standalone index first so MySQL has another index to fall back to.
+        // Older MySQL doesn't support CREATE INDEX IF NOT EXISTS, so check manually.
+        if (!$indexes->contains('tm_position_id_idx')) {
+            Schema::table('training_matrix', function (Blueprint $table) {
+                $table->index('position_id', 'tm_position_id_idx');
+            });
+        }
+
+        if ($indexes->contains('training_matrix_position_id_document_id_unique')) {
+            Schema::table('training_matrix', function (Blueprint $table) {
+                $table->dropUnique('training_matrix_position_id_document_id_unique');
+            });
+        }
     }
 
     public function down(): void
