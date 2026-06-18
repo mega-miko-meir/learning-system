@@ -2,8 +2,15 @@ import { Head, Link, router } from "@inertiajs/react";
 import { useEffect, useRef, useState } from "react";
 import AppLayout from "../../../Layouts/AppLayout";
 
+function answersKey(id) { return `test_answers_${id}`; }
+
 export default function TestShow({ assignment, test, attempt_id, time_remaining }) {
-    const [answers, setAnswers]             = useState({});
+    const [answers, setAnswers] = useState(() => {
+        try {
+            const stored = localStorage.getItem(answersKey(attempt_id));
+            return stored ? JSON.parse(stored) : {};
+        } catch { return {}; }
+    });
     const [attemptId, setAttemptId]         = useState(attempt_id);
     const [attemptNumber, setAttemptNumber] = useState(assignment.attempt_count + 1);
     const [result, setResult]               = useState(null);
@@ -13,6 +20,13 @@ export default function TestShow({ assignment, test, attempt_id, time_remaining 
         test.time_limit ? (time_remaining ?? test.time_limit * 60) : null
     );
     const timerRef = useRef(null);
+
+    // Сохраняем ответы в localStorage чтобы пережить обновление страницы
+    useEffect(() => {
+        if (attemptId) {
+            localStorage.setItem(answersKey(attemptId), JSON.stringify(answers));
+        }
+    }, [answers, attemptId]);
 
     // Keepalive — не даём сессии протухнуть во время теста (баг 419)
     useEffect(() => {
@@ -84,6 +98,7 @@ export default function TestShow({ assignment, test, attempt_id, time_remaining 
                 route("employee.test.submit", assignment.id),
                 { attempt_id: attemptId, answers }
             );
+            localStorage.removeItem(answersKey(attemptId));
             setResult(data);
         } catch (err) {
             const status = err?.response?.status;
@@ -95,6 +110,7 @@ export default function TestShow({ assignment, test, attempt_id, time_remaining 
                         route("employee.test.submit", assignment.id),
                         { attempt_id: attemptId, answers }
                     );
+                    localStorage.removeItem(answersKey(attemptId));
                     setResult(data);
                 } catch {
                     alert("Сессия устарела. Обновите страницу и сдайте тест снова.");
@@ -172,6 +188,7 @@ export default function TestShow({ assignment, test, attempt_id, time_remaining 
                             {!result.passed && !result.blocked && (
                                 <button
                                     onClick={async () => {
+                                        localStorage.removeItem(answersKey(attemptId));
                                         setResult(null);
                                         setAnswers({});
                                         setAttemptId(null);
