@@ -384,7 +384,12 @@ export default function MatrixIndex({ matrix, positions, documents, departments 
                                         {rows.map((m) => (
                                             <tr key={m.id} className="hover:bg-gray-50 transition-colors">
                                                 <td className="px-4 py-2.5 text-gray-700">{m.position}</td>
-                                                <td className="px-4 py-2.5 text-gray-600">{m.document}</td>
+                                                <td className="px-4 py-2.5 text-gray-600">
+                                                    {m.document_code && (
+                                                        <span className="text-xs font-medium text-gray-400 mr-1.5">{m.document_code}</span>
+                                                    )}
+                                                    {m.document}
+                                                </td>
                                                 <td className="px-4 py-2.5">
                                                     <span className="text-xs text-gray-500">
                                                         {TRAINING_TYPES.find((t) => t.value === m.training_type)?.label ?? m.training_type}
