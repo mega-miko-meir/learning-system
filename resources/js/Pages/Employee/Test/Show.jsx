@@ -17,8 +17,8 @@ export default function TestShow({ assignment, test, attempt_id, time_remaining 
     // Keepalive — не даём сессии протухнуть во время теста (баг 419)
     useEffect(() => {
         const ping = setInterval(() => {
-            window.axios.get(route("employee.assignments.show", assignment.id)).catch(() => {});
-        }, 60_000);
+            window.axios.get(route("ping")).catch(() => {});
+        }, 4 * 60_000); // каждые 4 минуты достаточно
         return () => clearInterval(ping);
     }, []);
 
@@ -87,7 +87,19 @@ export default function TestShow({ assignment, test, attempt_id, time_remaining 
             setResult(data);
         } catch (err) {
             const status = err?.response?.status;
-            if (status === 422) {
+            if (status === 419) {
+                // CSRF-токен устарел — обновляем сессию и пробуем один раз автоматически
+                try {
+                    await window.axios.get(route("ping"));
+                    const { data } = await window.axios.post(
+                        route("employee.test.submit", assignment.id),
+                        { attempt_id: attemptId, answers }
+                    );
+                    setResult(data);
+                } catch {
+                    alert("Сессия устарела. Обновите страницу и сдайте тест снова.");
+                }
+            } else if (status === 422) {
                 alert("Ошибка валидации. Попробуйте ещё раз.");
             } else {
                 alert(`Ошибка при отправке теста (${status ?? "сеть"}). Попробуйте ещё раз.`);

@@ -21,6 +21,9 @@ Route::middleware(['auth', 'user.active'])->group(function () {
     // Просмотр документов (inline PDF, без скачивания)
     Route::get('/documents/{document}/view', [\App\Http\Controllers\DocumentViewController::class, 'view'])->name('documents.view');
 
+    // Keepalive — обновляет сессию и CSRF-токен, предотвращает 419 при долгих тестах
+    Route::get('/ping', fn () => response()->noContent())->name('ping');
+
     // Смена пароля при первом входе
     Route::get('/change-password', [AuthController::class, 'showChangePassword'])->name('password.change');
     Route::post('/change-password', [AuthController::class, 'changePassword'])->name('password.change.post');
