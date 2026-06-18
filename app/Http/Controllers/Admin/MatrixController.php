@@ -108,7 +108,7 @@ class MatrixController extends Controller
 
         foreach ($matrix as $item) {
             $users = User::active()
-                ->where('role', 'employee')
+                ->whereIn('role', ['employee', 'manager'])
                 ->where('position_id', $item->position_id)
                 ->get();
 
