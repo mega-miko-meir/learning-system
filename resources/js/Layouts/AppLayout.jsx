@@ -63,7 +63,6 @@ const NAV_ITEMS = {
         { href: "manager.dashboard",       icon: ICONS.dashboard,   label: "Главная" },
         { href: "manager.employees",       icon: ICONS.users,       label: "Мои сотрудники" },
         { href: "manager.reports",         icon: ICONS.reports,     label: "Отчёты" },
-        { href: "employee.dashboard",      icon: ICONS.assignments, label: "Моё обучение" },
     ],
     employee: [
         { href: "employee.dashboard",      icon: ICONS.dashboard,   label: "Мой кабинет" },
