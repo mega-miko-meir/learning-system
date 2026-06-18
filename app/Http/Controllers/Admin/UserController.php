@@ -418,14 +418,12 @@ class UserController extends Controller
         ]);
 
         $emailSent = false;
-        $emailError = null;
         if ($user->email) {
             try {
                 Mail::to($user->email)->send(new PasswordResetNotification($user, $tempPassword));
                 $emailSent = true;
             } catch (\Exception $e) {
-                $emailError = $e->getMessage();
-                Log::error('PasswordReset mail failed: ' . $emailError);
+                Log::error('PasswordReset mail failed: ' . $e->getMessage());
             }
         }
 
@@ -435,7 +433,7 @@ class UserController extends Controller
         } elseif (!$user->email) {
             $successMsg .= ' Email не указан — письмо не отправлено.';
         } else {
-            $successMsg .= ' Не удалось отправить письмо: ' . $emailError;
+            $successMsg .= ' Не удалось отправить письмо на ' . $user->email . ' (ошибка SMTP).';
         }
 
         return back()
