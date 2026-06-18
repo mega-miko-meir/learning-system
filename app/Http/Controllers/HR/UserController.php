@@ -399,6 +399,8 @@ class UserController extends Controller
             $successMsg .= ' Письмо с новым паролем отправлено на ' . $user->email . '.';
         } elseif (!$user->email) {
             $successMsg .= ' Email не указан — письмо не отправлено.';
+        } else {
+            $successMsg .= ' Не удалось отправить письмо на ' . $user->email . ' (ошибка SMTP).';
         }
 
         return back()
