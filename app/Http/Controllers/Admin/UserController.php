@@ -116,17 +116,26 @@ class UserController extends Controller
             'created_at' => now(),
         ]);
 
+        $emailSent = false;
         if ($user->email) {
             try {
                 $user->load(['department', 'position']);
                 Mail::to($user->email)->send(new AccountCreated($user, $tempPassword));
+                $emailSent = true;
             } catch (\Exception $e) {
                 Log::error('AccountCreated mail failed: ' . $e->getMessage());
             }
         }
 
+        $successMsg = 'Сотрудник успешно создан.';
+        if ($emailSent) {
+            $successMsg .= ' Письмо с данными для входа отправлено на ' . $user->email . '.';
+        } elseif (!$user->email) {
+            $successMsg .= ' Email не указан — письмо не отправлено.';
+        }
+
         return redirect()->route('admin.users.show', $user)
-            ->with('success', 'Сотрудник успешно создан.')
+            ->with('success', $successMsg)
             ->with('temp_password', $tempPassword);
     }
 
@@ -408,16 +417,25 @@ class UserController extends Controller
             'created_at' => now(),
         ]);
 
+        $emailSent = false;
         if ($user->email) {
             try {
                 Mail::to($user->email)->send(new PasswordResetNotification($user, $tempPassword));
+                $emailSent = true;
             } catch (\Exception $e) {
                 Log::error('PasswordReset mail failed: ' . $e->getMessage());
             }
         }
 
+        $successMsg = 'Пароль сброшен.';
+        if ($emailSent) {
+            $successMsg .= ' Письмо с новым паролем отправлено на ' . $user->email . '.';
+        } elseif (!$user->email) {
+            $successMsg .= ' Email не указан — письмо не отправлено.';
+        }
+
         return back()
-            ->with('success', 'Пароль сброшен.')
+            ->with('success', $successMsg)
             ->with('temp_password', $tempPassword);
     }
 
