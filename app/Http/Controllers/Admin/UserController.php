@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Mail\AccountCreated;
 use App\Mail\NewEmployeeInduction;
 use App\Mail\NewTrainingAssigned;
+use App\Mail\PasswordResetNotification;
 use App\Models\AuditLog;
 use App\Models\Department;
 use App\Models\Document;
@@ -113,6 +115,15 @@ class UserController extends Controller
             'description'=> "Создан сотрудник: {$user->full_name}",
             'created_at' => now(),
         ]);
+
+        if ($user->email) {
+            try {
+                $user->load(['department', 'position']);
+                Mail::to($user->email)->send(new AccountCreated($user, $tempPassword));
+            } catch (\Exception $e) {
+                Log::error('AccountCreated mail failed: ' . $e->getMessage());
+            }
+        }
 
         return redirect()->route('admin.users.show', $user)
             ->with('success', 'Сотрудник успешно создан.')
@@ -396,6 +407,14 @@ class UserController extends Controller
             'description'=> "Сброшен пароль для: {$user->full_name}",
             'created_at' => now(),
         ]);
+
+        if ($user->email) {
+            try {
+                Mail::to($user->email)->send(new PasswordResetNotification($user, $tempPassword));
+            } catch (\Exception $e) {
+                Log::error('PasswordReset mail failed: ' . $e->getMessage());
+            }
+        }
 
         return back()
             ->with('success', 'Пароль сброшен.')
