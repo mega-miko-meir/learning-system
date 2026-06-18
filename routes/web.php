@@ -49,6 +49,7 @@ Route::middleware(['auth', 'user.active'])->group(function () {
         Route::get('/employees/{user}', [\App\Http\Controllers\Manager\EmployeeController::class, 'show'])->name('employees.show');
         Route::get('/employees/{user}/pdf', [\App\Http\Controllers\Manager\EmployeeController::class, 'pdf'])->name('employees.pdf');
         Route::get('/reports', [\App\Http\Controllers\Manager\ReportController::class, 'index'])->name('reports');
+        Route::get('/reports/pdf', [\App\Http\Controllers\Manager\ReportController::class, 'teamPdf'])->name('reports.pdf');
     });
 
     // ─── Суперадмин ───────────────────────────────────────────

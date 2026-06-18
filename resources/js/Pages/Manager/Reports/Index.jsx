@@ -11,6 +11,19 @@ export default function ManagerReports({ report }) {
         <AppLayout title="Отчёт по команде">
             <Head title="Отчёт по команде" />
 
+            <div className="flex items-center justify-between mb-6">
+                <h1 className="text-lg font-semibold text-gray-900">Отчёт по команде</h1>
+                <a
+                    href={route("manager.reports.pdf")}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
+                >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                    </svg>
+                    Скачать PDF
+                </a>
+            </div>
+
             <div className="grid grid-cols-3 gap-4 mb-8">
                 <div className="bg-white rounded-xl border border-gray-100 p-5">
                     <p className="text-sm text-gray-400 mb-1">Сотрудников</p>
