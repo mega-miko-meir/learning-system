@@ -27,10 +27,6 @@ export default function AssignmentShow({ assignment }) {
         view_url,
     } = assignment;
 
-    if (status === "pending" && (time_spent_seconds ?? 0) === 0) {
-        sessionStorage.removeItem(sessionKey(id));
-    }
-
     const storedSeconds  = parseInt(sessionStorage.getItem(sessionKey(id)) ?? "0", 10);
     const initialSeconds = Math.max(time_spent_seconds ?? 0, storedSeconds);
 
