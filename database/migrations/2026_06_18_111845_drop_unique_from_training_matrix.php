@@ -12,17 +12,21 @@ return new class extends Migration
      */
     public function up(): void
     {
-        DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        // MySQL uses the unique composite index to enforce the position_id FK.
+        // We must add a standalone index on position_id first so MySQL has
+        // another index to fall back to before we drop the unique constraint.
         Schema::table('training_matrix', function (Blueprint $table) {
-            $table->dropUnique('training_matrix_position_id_document_id_unique');
+            $table->index('position_id', 'tm_position_id_idx');
         });
-        DB::statement('SET FOREIGN_KEY_CHECKS=1');
+
+        DB::statement('ALTER TABLE training_matrix DROP INDEX IF EXISTS training_matrix_position_id_document_id_unique');
     }
 
     public function down(): void
     {
         Schema::table('training_matrix', function (Blueprint $table) {
             $table->unique(['position_id', 'document_id']);
+            $table->dropIndex('tm_position_id_idx');
         });
     }
 };
