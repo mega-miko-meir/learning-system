@@ -15,7 +15,7 @@ export default function HRUserForm({ user, departments, managers }) {
         manager_id:           user?.manager_id    ?? "",
         hired_at:             user?.hired_at      ?? "",
         must_change_password: true,
-        send_email:           false,
+        send_email:           true,
     });
 
     const availablePositions = departments

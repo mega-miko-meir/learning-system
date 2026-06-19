@@ -119,14 +119,19 @@ class UserController extends Controller
         $successMsg = 'Сотрудник успешно создан.';
 
         if ($request->boolean('send_email') && $user->email) {
-            try {
-                $user->load(['department', 'position']);
-                Mail::to($user->email)->send(new AccountCreated($user, $tempPassword));
-                $successMsg .= ' Письмо с данными для входа отправлено на ' . $user->email . '.';
-            } catch (\Exception $e) {
-                Log::error('AccountCreated mail failed: ' . $e->getMessage());
-                $successMsg .= ' Ошибка отправки письма: ' . $e->getMessage();
-            }
+            $userId   = $user->id;
+            $tempPwd  = $tempPassword;
+            dispatch(function () use ($userId, $tempPwd) {
+                try {
+                    $u = User::with(['department', 'position'])->find($userId);
+                    if ($u?->email) {
+                        Mail::to($u->email)->send(new AccountCreated($u, $tempPwd));
+                    }
+                } catch (\Exception $e) {
+                    Log::error('AccountCreated mail failed: ' . $e->getMessage());
+                }
+            })->afterResponse();
+            $successMsg .= ' Письмо с данными для входа отправлено на ' . $user->email . '.';
         }
 
         return redirect()->route('admin.users.show', $user)
@@ -415,13 +420,19 @@ class UserController extends Controller
         $successMsg = 'Пароль сброшен.';
 
         if ($request->boolean('send_email') && $user->email) {
-            try {
-                Mail::to($user->email)->send(new PasswordResetNotification($user, $tempPassword));
-                $successMsg .= ' Письмо с новым паролем отправлено на ' . $user->email . '.';
-            } catch (\Exception $e) {
-                Log::error('PasswordReset mail failed: ' . $e->getMessage());
-                $successMsg .= ' Ошибка отправки письма: ' . $e->getMessage();
-            }
+            $userId  = $user->id;
+            $tempPwd = $tempPassword;
+            dispatch(function () use ($userId, $tempPwd) {
+                try {
+                    $u = User::find($userId);
+                    if ($u?->email) {
+                        Mail::to($u->email)->send(new PasswordResetNotification($u, $tempPwd));
+                    }
+                } catch (\Exception $e) {
+                    Log::error('PasswordReset mail failed: ' . $e->getMessage());
+                }
+            })->afterResponse();
+            $successMsg .= ' Письмо с новым паролем отправлено на ' . $user->email . '.';
         }
 
         return back()

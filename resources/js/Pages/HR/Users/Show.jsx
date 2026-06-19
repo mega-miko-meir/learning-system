@@ -198,7 +198,7 @@ function TempPasswordModal({ title, password, employee, onClose }) {
 
 function ResetPasswordModal({ employee, onConfirm, onClose }) {
     const [mustChange, setMustChange] = useState(true);
-    const [sendEmail, setSendEmail]   = useState(false);
+    const [sendEmail, setSendEmail]   = useState(true);
 
     return (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
