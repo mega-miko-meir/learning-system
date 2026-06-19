@@ -196,28 +196,40 @@ function TempPasswordModal({ title, password, employee, onClose }) {
     );
 }
 
-function ResetPasswordModal({ onConfirm, onClose }) {
+function ResetPasswordModal({ employee, onConfirm, onClose }) {
     const [mustChange, setMustChange] = useState(true);
+    const [sendEmail, setSendEmail]   = useState(false);
 
     return (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
             <div className="bg-white rounded-2xl p-6 w-full max-w-sm mx-4 shadow-xl">
                 <h3 className="text-base font-semibold text-gray-900 mb-1">Сброс пароля</h3>
-                <p className="text-sm text-gray-500 mb-4">
-                    Будет создан новый временный пароль.
-                </p>
-                <label className="flex items-center gap-2.5 text-sm text-gray-700 mb-6 cursor-pointer select-none">
-                    <input
-                        type="checkbox"
-                        checked={mustChange}
-                        onChange={(e) => setMustChange(e.target.checked)}
-                        className="w-4 h-4 accent-blue-600"
-                    />
-                    Потребовать смену пароля при первом входе
-                </label>
+                <p className="text-sm text-gray-500 mb-4">Будет создан новый временный пароль.</p>
+                <div className="space-y-3 mb-6">
+                    <label className="flex items-center gap-2.5 text-sm text-gray-700 cursor-pointer select-none">
+                        <input
+                            type="checkbox"
+                            checked={mustChange}
+                            onChange={(e) => setMustChange(e.target.checked)}
+                            className="w-4 h-4 accent-blue-600"
+                        />
+                        Потребовать смену пароля при первом входе
+                    </label>
+                    <label className={`flex items-center gap-2.5 text-sm cursor-pointer select-none ${employee.email ? "text-gray-700" : "text-gray-400"}`}>
+                        <input
+                            type="checkbox"
+                            checked={sendEmail}
+                            onChange={(e) => setSendEmail(e.target.checked)}
+                            disabled={!employee.email}
+                            className="w-4 h-4 accent-blue-600"
+                        />
+                        Отправить учётные данные на email
+                        {!employee.email && <span className="text-xs text-gray-400">(email не указан)</span>}
+                    </label>
+                </div>
                 <div className="flex gap-2">
                     <button
-                        onClick={() => onConfirm(mustChange)}
+                        onClick={() => onConfirm(mustChange, sendEmail)}
                         className="flex-1 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
                     >
                         Сбросить
@@ -268,10 +280,11 @@ export default function HRUserShow({ employee, assignments, documents }) {
         router.post(route("hr.users.activate", employee.id));
     }
 
-    function submitReset(mustChange) {
+    function submitReset(mustChange, sendEmail) {
         setShowResetModal(false);
         router.post(route("hr.users.reset-password", employee.id), {
             must_change_password: mustChange,
+            send_email:           sendEmail,
         });
     }
 
@@ -290,6 +303,7 @@ export default function HRUserShow({ employee, assignments, documents }) {
 
             {showResetModal && (
                 <ResetPasswordModal
+                    employee={employee}
                     onConfirm={submitReset}
                     onClose={() => setShowResetModal(false)}
                 />

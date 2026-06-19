@@ -116,22 +116,17 @@ class UserController extends Controller
             'created_at' => now(),
         ]);
 
-        $emailSent = false;
-        if ($user->email) {
+        $successMsg = 'Сотрудник успешно создан.';
+
+        if ($request->boolean('send_email') && $user->email) {
             try {
                 $user->load(['department', 'position']);
                 Mail::to($user->email)->send(new AccountCreated($user, $tempPassword));
-                $emailSent = true;
+                $successMsg .= ' Письмо с данными для входа отправлено на ' . $user->email . '.';
             } catch (\Exception $e) {
                 Log::error('AccountCreated mail failed: ' . $e->getMessage());
+                $successMsg .= ' Ошибка отправки письма: ' . $e->getMessage();
             }
-        }
-
-        $successMsg = 'Сотрудник успешно создан.';
-        if ($emailSent) {
-            $successMsg .= ' Письмо с данными для входа отправлено на ' . $user->email . '.';
-        } elseif (!$user->email) {
-            $successMsg .= ' Email не указан — письмо не отправлено.';
         }
 
         return redirect()->route('admin.users.show', $user)
@@ -417,25 +412,16 @@ class UserController extends Controller
             'created_at' => now(),
         ]);
 
-        $emailSent = false;
-        $emailError = null;
-        if ($user->email) {
+        $successMsg = 'Пароль сброшен.';
+
+        if ($request->boolean('send_email') && $user->email) {
             try {
                 Mail::to($user->email)->send(new PasswordResetNotification($user, $tempPassword));
-                $emailSent = true;
+                $successMsg .= ' Письмо с новым паролем отправлено на ' . $user->email . '.';
             } catch (\Exception $e) {
-                $emailError = $e->getMessage();
-                Log::error('PasswordReset mail failed: ' . $emailError);
+                Log::error('PasswordReset mail failed: ' . $e->getMessage());
+                $successMsg .= ' Ошибка отправки письма: ' . $e->getMessage();
             }
-        }
-
-        $successMsg = 'Пароль сброшен.';
-        if ($emailSent) {
-            $successMsg .= ' Письмо с новым паролем отправлено на ' . $user->email . '.';
-        } elseif (!$user->email) {
-            $successMsg .= ' Email не указан — письмо не отправлено.';
-        } else {
-            $successMsg .= ' Ошибка: ' . $emailError;
         }
 
         return back()

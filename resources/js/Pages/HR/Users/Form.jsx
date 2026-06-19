@@ -15,6 +15,7 @@ export default function HRUserForm({ user, departments, managers }) {
         manager_id:           user?.manager_id    ?? "",
         hired_at:             user?.hired_at      ?? "",
         must_change_password: true,
+        send_email:           false,
     });
 
     const availablePositions = departments
@@ -121,15 +122,28 @@ export default function HRUserForm({ user, departments, managers }) {
                     </div>
 
                     {!isEdit && (
-                        <label className="flex items-center gap-2.5 text-sm text-gray-700 cursor-pointer select-none">
-                            <input
-                                type="checkbox"
-                                checked={data.must_change_password}
-                                onChange={(e) => setData("must_change_password", e.target.checked)}
-                                className="w-4 h-4 accent-blue-600"
-                            />
-                            Потребовать смену пароля при первом входе
-                        </label>
+                        <div className="space-y-3">
+                            <label className="flex items-center gap-2.5 text-sm text-gray-700 cursor-pointer select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={data.must_change_password}
+                                    onChange={(e) => setData("must_change_password", e.target.checked)}
+                                    className="w-4 h-4 accent-blue-600"
+                                />
+                                Потребовать смену пароля при первом входе
+                            </label>
+                            <label className={`flex items-center gap-2.5 text-sm cursor-pointer select-none ${data.email ? "text-gray-700" : "text-gray-400"}`}>
+                                <input
+                                    type="checkbox"
+                                    checked={data.send_email}
+                                    onChange={(e) => setData("send_email", e.target.checked)}
+                                    disabled={!data.email}
+                                    className="w-4 h-4 accent-blue-600"
+                                />
+                                Отправить учётные данные на email
+                                {!data.email && <span className="text-xs text-gray-400">(сначала укажите email)</span>}
+                            </label>
+                        </div>
                     )}
 
                     <div className="flex gap-3 pt-2">
