@@ -15,7 +15,6 @@ body{font-family:Arial,sans-serif;background:#f5f7fa;margin:0;padding:20px}
 <body>
 <div class="card">
     <div class="header">Пароль сброшен</div>
-    <div class="badge">Требуется смена пароля</div>
     <p style="color:#374151;font-size:15px">Здравствуйте, <strong>{{ $user->full_name }}</strong>!</p>
     <p style="color:#374151;font-size:14px">Администратор сбросил ваш пароль. Войдите с новым временным паролем и сразу смените его.</p>
 
