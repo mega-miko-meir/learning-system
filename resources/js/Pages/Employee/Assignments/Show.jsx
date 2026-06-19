@@ -1,4 +1,4 @@
-import { Head, Link } from "@inertiajs/react";
+import { Head, Link, router } from "@inertiajs/react";
 import { useEffect, useRef, useState } from "react";
 import AppLayout from "../../../Layouts/AppLayout";
 import PdfViewer from "../../../Components/PdfViewer";
@@ -50,7 +50,11 @@ export default function AssignmentShow({ assignment }) {
 
     useEffect(() => {
         if (status === "pending") {
-            window.axios.post(route("employee.assignments.start", id));
+            // Обновляем запись истории Inertia после старта, чтобы кнопка «Назад» не восстанавливала
+            // устаревший статус pending (который сбрасывает таймер через useEffect ниже)
+            window.axios.post(route("employee.assignments.start", id))
+                .then(() => router.reload({ only: ["assignment"] }))
+                .catch(() => {});
         }
     }, []);
 

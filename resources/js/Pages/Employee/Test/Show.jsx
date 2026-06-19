@@ -2,7 +2,8 @@ import { Head, Link, router } from "@inertiajs/react";
 import { useEffect, useRef, useState } from "react";
 import AppLayout from "../../../Layouts/AppLayout";
 
-function answersKey(id) { return `test_answers_${id}`; }
+function answersKey(id)  { return `test_answers_${id}`; }
+function deadlineKey(id) { return `test_deadline_${id}`; }
 
 export default function TestShow({ assignment, test, attempt_id, time_remaining }) {
     const [answers, setAnswers] = useState(() => {
@@ -15,10 +16,20 @@ export default function TestShow({ assignment, test, attempt_id, time_remaining 
     const [attemptNumber, setAttemptNumber] = useState(assignment.attempt_count + 1);
     const [result, setResult]               = useState(null);
     const [submitting, setSubmitting]       = useState(false);
-    // time_remaining от сервера — авторитетный источник (учитывает started_at)
-    const [timeLeft, setTimeLeft] = useState(
-        test.time_limit ? (time_remaining ?? test.time_limit * 60) : null
-    );
+    // Таймер: храним абсолютный дедлайн в localStorage, чтобы пережить навигацию и обновление
+    // страницы без зависимости от устаревших пропов Inertia (history cache).
+    const [timeLeft, setTimeLeft] = useState(() => {
+        if (!test.time_limit) return null;
+        const saved = localStorage.getItem(deadlineKey(attempt_id));
+        if (saved) {
+            const remaining = Math.round((parseInt(saved, 10) - Date.now()) / 1000);
+            return Math.max(0, remaining);
+        }
+        // Первое открытие: берём time_remaining от сервера и сохраняем дедлайн
+        const initial = time_remaining ?? test.time_limit * 60;
+        localStorage.setItem(deadlineKey(attempt_id), String(Date.now() + initial * 1000));
+        return initial;
+    });
     const timerRef = useRef(null);
 
     // Сохраняем ответы в localStorage чтобы пережить обновление страницы
@@ -99,6 +110,7 @@ export default function TestShow({ assignment, test, attempt_id, time_remaining 
                 { attempt_id: attemptId, answers }
             );
             localStorage.removeItem(answersKey(attemptId));
+            localStorage.removeItem(deadlineKey(attemptId));
             setResult(data);
         } catch (err) {
             const status = err?.response?.status;
@@ -111,6 +123,7 @@ export default function TestShow({ assignment, test, attempt_id, time_remaining 
                         { attempt_id: attemptId, answers }
                     );
                     localStorage.removeItem(answersKey(attemptId));
+                    localStorage.removeItem(deadlineKey(attemptId));
                     setResult(data);
                 } catch {
                     alert("Сессия устарела. Обновите страницу и сдайте тест снова.");
@@ -129,6 +142,13 @@ export default function TestShow({ assignment, test, attempt_id, time_remaining 
     async function startNewAttempt() {
         try {
             const { data } = await window.axios.post(route("employee.test.start", assignment.id));
+            // Устанавливаем новый дедлайн для новой попытки (полное время с нуля)
+            if (test.time_limit) {
+                localStorage.setItem(
+                    deadlineKey(data.attempt_id),
+                    String(Date.now() + test.time_limit * 60 * 1000)
+                );
+            }
             setAttemptId(data.attempt_id);
             setAttemptNumber(data.attempt_number);
         } catch {
@@ -189,6 +209,7 @@ export default function TestShow({ assignment, test, attempt_id, time_remaining 
                                 <button
                                     onClick={async () => {
                                         localStorage.removeItem(answersKey(attemptId));
+                                        localStorage.removeItem(deadlineKey(attemptId));
                                         setResult(null);
                                         setAnswers({});
                                         setAttemptId(null);
@@ -209,22 +230,21 @@ export default function TestShow({ assignment, test, attempt_id, time_remaining 
 
     // ── Экран теста ───────────────────────────────────────────────────
     return (
-        <AppLayout title={test.title}>
+        <AppLayout fullHeight>
             <Head title={test.title} />
 
-            {/* Шапка */}
-            <div className="flex items-center justify-between mb-6">
-                <div>
-                    <p className="text-xs text-gray-400 mb-1">
+            {/* Компактная шапка: название + попытка + порог + таймер */}
+            <div className="px-8 py-3 border-b border-gray-100 bg-white shrink-0 flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                    <p className="text-[11px] text-gray-400 mb-0.5">
                         Попытка {attemptNumber} из {assignment.max_attempts}
+                        <span className="mx-2 text-gray-200">|</span>
+                        Порог сдачи: {test.pass_percentage}%
                     </p>
-                    <h2 className="text-lg font-semibold text-gray-900">{test.title}</h2>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                        Для сдачи нужно {test.pass_percentage}% верных ответов
-                    </p>
+                    <h1 className="text-base font-semibold text-gray-900 truncate">{test.title}</h1>
                 </div>
                 {timeLeft !== null && (
-                    <div className={`font-mono text-xl font-bold px-4 py-2 rounded-xl ${
+                    <div className={`font-mono text-lg font-bold px-3 py-1 rounded-lg shrink-0 ${
                         timeLeft < 60 ? "bg-red-50 text-red-600" : "bg-blue-50 text-blue-700"
                     }`}>
                         {formatTime(timeLeft)}
@@ -232,55 +252,56 @@ export default function TestShow({ assignment, test, attempt_id, time_remaining 
                 )}
             </div>
 
-            {/* Вопросы */}
-            <div className="space-y-6">
-                {test.questions.map((q, idx) => (
-                    <div key={q.id} className="bg-white rounded-xl border border-gray-100 p-5">
-                        <p className="font-medium text-gray-900 mb-4">
-                            <span className="text-gray-400 mr-2">{idx + 1}.</span>
-                            {q.text}
-                        </p>
-                        <div className="space-y-2">
-                            {q.answers.map((a) => {
-                                const selected =
-                                    q.type === "multiple"
-                                        ? (answers[q.id] ?? []).includes(a.id)
-                                        : answers[q.id] === a.id;
-                                return (
-                                    <label
-                                        key={a.id}
-                                        className={`flex items-center gap-3 px-4 py-3 rounded-lg border cursor-pointer transition-colors ${
-                                            selected
-                                                ? "border-blue-400 bg-blue-50"
-                                                : "border-gray-100 hover:border-gray-200 hover:bg-gray-50"
-                                        }`}
-                                    >
-                                        <input
-                                            type={q.type === "multiple" ? "checkbox" : "radio"}
-                                            name={`q_${q.id}`}
-                                            checked={selected}
-                                            onChange={() => pick(q.id, a.id, q.type)}
-                                            className="accent-blue-600"
-                                        />
-                                        <span className="text-sm text-gray-800">{a.text}</span>
-                                    </label>
-                                );
-                            })}
+            {/* Скроллируемая область: вопросы + кнопка */}
+            <div className="flex-1 overflow-y-auto px-8 py-6">
+                <div className="space-y-6">
+                    {test.questions.map((q, idx) => (
+                        <div key={q.id} className="bg-white rounded-xl border border-gray-100 p-5">
+                            <p className="font-medium text-gray-900 mb-4">
+                                <span className="text-gray-400 mr-2">{idx + 1}.</span>
+                                {q.text}
+                            </p>
+                            <div className="space-y-2">
+                                {q.answers.map((a) => {
+                                    const selected =
+                                        q.type === "multiple"
+                                            ? (answers[q.id] ?? []).includes(a.id)
+                                            : answers[q.id] === a.id;
+                                    return (
+                                        <label
+                                            key={a.id}
+                                            className={`flex items-center gap-3 px-4 py-3 rounded-lg border cursor-pointer transition-colors ${
+                                                selected
+                                                    ? "border-blue-400 bg-blue-50"
+                                                    : "border-gray-100 hover:border-gray-200 hover:bg-gray-50"
+                                            }`}
+                                        >
+                                            <input
+                                                type={q.type === "multiple" ? "checkbox" : "radio"}
+                                                name={`q_${q.id}`}
+                                                checked={selected}
+                                                onChange={() => pick(q.id, a.id, q.type)}
+                                                className="accent-blue-600"
+                                            />
+                                            <span className="text-sm text-gray-800">{a.text}</span>
+                                        </label>
+                                    );
+                                })}
+                            </div>
                         </div>
-                    </div>
-                ))}
-            </div>
+                    ))}
+                </div>
 
-            {/* Кнопка сдачи */}
-            <div className="flex justify-end mt-8">
-                <button
-                    onClick={handleSubmit}
-                    disabled={submitting || !attemptId}
-                    className="px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-xl
-                        hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors"
-                >
-                    {submitting ? "Проверяем..." : "Сдать тест"}
-                </button>
+                <div className="flex justify-end mt-8 pb-4">
+                    <button
+                        onClick={handleSubmit}
+                        disabled={submitting || !attemptId}
+                        className="px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-xl
+                            hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors"
+                    >
+                        {submitting ? "Проверяем..." : "Сдать тест"}
+                    </button>
+                </div>
             </div>
         </AppLayout>
     );

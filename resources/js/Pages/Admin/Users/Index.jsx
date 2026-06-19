@@ -20,18 +20,22 @@ const ROLE_LABELS = {
 
 export default function UsersIndex({ users, departments }) {
     const params = Object.fromEntries(new URLSearchParams(window.location.search));
-    const [search, setSearch] = useState(params.search ?? "");
+    const [search, setSearch] = useState("");
 
     function filter(key, value) {
-        router.get(route("admin.users.index"), { ...params, [key]: value || undefined }, {
+        const { search: _omit, ...rest } = params;
+        router.get(route("admin.users.index"), { ...rest, [key]: value || undefined }, {
             preserveState: true, replace: true,
         });
     }
 
-    function doSearch(e) {
-        e.preventDefault();
-        filter("search", search);
-    }
+    const q = search.trim().toLowerCase();
+    const visibleRows = q
+        ? users.data.filter((u) =>
+            [u.full_name, u.department, u.position, u.email, u.phone]
+                .some((v) => v?.toLowerCase().includes(q))
+        )
+        : users.data;
 
     return (
         <AppLayout title="Сотрудники">
@@ -39,15 +43,26 @@ export default function UsersIndex({ users, departments }) {
 
             {/* Фильтры */}
             <div className="flex flex-wrap gap-2 mb-6 items-center">
-                <form onSubmit={doSearch} className="flex gap-2">
+                {/* Поиск — фронтенд */}
+                <div className="relative">
+                    <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none"
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                            d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+                    </svg>
                     <input
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Поиск..."
-                        className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-48"
+                        placeholder="Поиск по имени, отделу..."
+                        className="pl-8 pr-7 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-56"
                     />
-                    <button className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm">Найти</button>
-                </form>
+                    {search && (
+                        <button onClick={() => setSearch("")}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                            ×
+                        </button>
+                    )}
+                </div>
 
                 <select
                     value={params.department_id ?? ""}
@@ -80,6 +95,10 @@ export default function UsersIndex({ users, departments }) {
                     <option value="all">Все сотрудники</option>
                 </select>
 
+                {q && (
+                    <span className="text-xs text-gray-400">Найдено: {visibleRows.length}</span>
+                )}
+
                 <Link
                     href={route("admin.users.create")}
                     className="ml-auto px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
@@ -103,14 +122,14 @@ export default function UsersIndex({ users, departments }) {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                        {users.data.length === 0 ? (
+                        {visibleRows.length === 0 ? (
                             <tr>
                                 <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
                                     Сотрудников не найдено
                                 </td>
                             </tr>
                         ) : (
-                            users.data.map((u) => (
+                            visibleRows.map((u) => (
                                 <tr key={u.id} className="hover:bg-gray-50">
                                     <td className="px-4 py-3 font-medium text-gray-900">{u.full_name}</td>
                                     <td className="px-4 py-3">
@@ -153,7 +172,7 @@ export default function UsersIndex({ users, departments }) {
                 </table>
             </div>
 
-            <Pagination links={users.links} />
+            {!q && <Pagination links={users.links} />}
         </AppLayout>
     );
 }
