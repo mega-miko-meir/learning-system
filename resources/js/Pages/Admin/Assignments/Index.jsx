@@ -23,6 +23,15 @@ const READING_MINUTES = [5, 10, 15, 20, 30, 45, 60];
 export default function AssignmentsIndex({ assignments, departments, positions, documents }) {
     const params = Object.fromEntries(new URLSearchParams(window.location.search));
 
+    // ── Поиск по сотруднику (фронтенд) ───────────────────────────────
+    const [search, setSearch] = useState("");
+
+    const visibleRows = search.trim()
+        ? assignments.data.filter((a) =>
+              a.user.toLowerCase().includes(search.trim().toLowerCase())
+          )
+        : assignments.data;
+
     // ── Bulk assign form ──────────────────────────────────────────────
     const [showBulk, setShowBulk]     = useState(false);
     const [deptFilter, setDeptFilter] = useState("");
@@ -102,6 +111,25 @@ export default function AssignmentsIndex({ assignments, departments, positions, 
 
             {/* ── Фильтры и кнопка ── */}
             <div className="flex flex-wrap gap-2 mb-6 items-center">
+                <div className="relative">
+                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 105 11a6 6 0 0012 0z" />
+                    </svg>
+                    <input
+                        type="text"
+                        placeholder="Поиск по сотруднику..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-52"
+                    />
+                    {search && (
+                        <button
+                            onClick={() => setSearch("")}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >×</button>
+                    )}
+                </div>
+
                 <select
                     value={params.status ?? ""}
                     onChange={(e) => filter("status", e.target.value)}
@@ -123,6 +151,12 @@ export default function AssignmentsIndex({ assignments, departments, positions, 
                         <option key={d.id} value={d.id}>{d.name}</option>
                     ))}
                 </select>
+
+                {search && (
+                    <span className="text-xs text-gray-400">
+                        Найдено: {visibleRows.length}
+                    </span>
+                )}
 
                 <button
                     onClick={() => setShowBulk(!showBulk)}
@@ -270,14 +304,14 @@ export default function AssignmentsIndex({ assignments, departments, positions, 
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                        {assignments.data.length === 0 ? (
+                        {visibleRows.length === 0 ? (
                             <tr>
                                 <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
-                                    Назначений нет
+                                    {search ? "Сотрудник не найден" : "Назначений нет"}
                                 </td>
                             </tr>
                         ) : (
-                            assignments.data.map((a) => (
+                            visibleRows.map((a) => (
                                 <tr key={a.id} className="hover:bg-gray-50">
                                     <td className="px-4 py-3">
                                         <Link
@@ -360,7 +394,7 @@ export default function AssignmentsIndex({ assignments, departments, positions, 
                 </table>
             </div>
 
-            <Pagination links={assignments.links} />
+            {!search && <Pagination links={assignments.links} />}
 
             {/* ── Модал редактирования ── */}
             {editing && (
