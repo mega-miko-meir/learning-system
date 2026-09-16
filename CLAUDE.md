@@ -11,7 +11,7 @@
 | Backend | Laravel 12, PHP 8.2+ |
 | Frontend | React 19, Inertia.js 3, Vite 7 |
 | CSS | Tailwind CSS 4 |
-| БД | MySQL (XAMPP), драйвер `database` |
+| БД | MySQL, драйвер `database` |
 | PDF | barryvdh/laravel-dompdf, pdfjs-dist |
 | Excel | maatwebsite/excel |
 | Маршруты в JS | tightenco/ziggy |
@@ -21,9 +21,10 @@
 
 ## Окружение (локальная разработка)
 
-- **Сервер**: XAMPP, Apache + MySQL
-- **URL**: `http://localhost:8000` (php artisan serve) или Apache на порту 80
-- **БД**: `learning-system` (MySQL, user: root, no password)
+- **Сервер**: локально только PHP (`php artisan serve`), Apache не используется
+- **URL**: `http://localhost:8000` (php artisan serve)
+- **БД**: `sop-project` — **реальная рабочая БД на удалённом сервере** `192.168.33.39:3306` (тот же сервер, что и у Nobel CRM/laravel-project), user `sopdb`. Локальной/dev-копии БД нет — все локальные изменения (миграции, сиды, тесты, пишущие в БД) применяются к реальным данным немедленно. Перед `migrate:fresh` или массовыми правками — сначала бэкап.
+- Доступ пользователя `sopdb` на сервере МySQL ограничен по хосту (GRANT на конкретный IP/подсеть клиента) — при смене IP этого ноутбука (DHCP) доступ отвалится с `Access denied`, нужно будет попросить админа сервера перевыдать GRANT на новый IP/подсеть.
 - **Часовой пояс**: `Asia/Tashkent` (UTC+5) — задан в `.env` как `APP_TIMEZONE`
 - **Очередь**: `QUEUE_CONNECTION=sync` — письма отправляются синхронно, queue worker не нужен
 - **Почта**: Gmail SMTP (`smtp.gmail.com:587`), нужен App Password в `MAIL_PASSWORD`
