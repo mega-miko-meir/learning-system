@@ -248,7 +248,7 @@ class UserController extends Controller
     private function notifyAdminsAboutNewEmployee(User $user): void
     {
         $admins = User::active()
-            ->whereIn('role', ['admin', 'superadmin'])
+            ->where('role', 'admin')
             ->whereNotNull('email')
             ->get();
 
