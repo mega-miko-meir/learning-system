@@ -108,7 +108,7 @@ class UserController extends Controller
             'created_at'  => now(),
         ]);
 
-        $this->notifyAdminsAboutNewEmployee($user->fresh(['position']));
+        $this->notifyAdminsAboutNewEmployee($user->fresh(['position', 'manager']));
 
         $successMsg = 'Сотрудник успешно создан.';
 

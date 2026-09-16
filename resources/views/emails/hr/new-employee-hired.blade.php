@@ -23,6 +23,7 @@ td:first-child{color:#64748b;width:45%}
         <tr><td>ФИО:</td><td><strong>{{ $employee->full_name }}</strong></td></tr>
         <tr><td>Должность:</td><td>{{ $employee->position?->name ?? 'Не указана' }}</td></tr>
         <tr><td>Дата приёма:</td><td><strong>{{ $employee->hired_at?->format('d.m.Y') ?? now()->format('d.m.Y') }}</strong></td></tr>
+        <tr><td>Руководитель:</td><td>{{ $employee->manager?->full_name ?? 'Не указан' }}</td></tr>
     </table>
 
     <a href="{{ route('admin.users.show', $employee->id) }}" class="btn">Открыть карточку сотрудника</a>
