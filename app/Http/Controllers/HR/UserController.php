@@ -4,6 +4,7 @@ namespace App\Http\Controllers\HR;
 
 use App\Http\Controllers\Controller;
 use App\Mail\AccountCreated;
+use App\Mail\NewEmployeeHired;
 use App\Mail\NewEmployeeInduction;
 use App\Mail\NewTrainingAssigned;
 use App\Mail\PasswordResetNotification;
@@ -106,6 +107,8 @@ class UserController extends Controller
             'description' => "Создан сотрудник: {$user->full_name}",
             'created_at'  => now(),
         ]);
+
+        $this->notifyAdminsAboutNewEmployee($user->fresh(['position']));
 
         $successMsg = 'Сотрудник успешно создан.';
 
@@ -240,6 +243,22 @@ class UserController extends Controller
         }
 
         return back()->with('success', $message);
+    }
+
+    private function notifyAdminsAboutNewEmployee(User $user): void
+    {
+        $admins = User::active()
+            ->whereIn('role', ['admin', 'superadmin'])
+            ->whereNotNull('email')
+            ->get();
+
+        foreach ($admins as $admin) {
+            try {
+                Mail::to($admin->email)->queue(new NewEmployeeHired($user));
+            } catch (\Exception $e) {
+                Log::error('NewEmployeeHired mail failed: ' . $e->getMessage());
+            }
+        }
     }
 
     private function notifyOokAboutNewEmployee(User $user, TrainingAssignment $assignment): void
