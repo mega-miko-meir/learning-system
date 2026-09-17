@@ -1,7 +1,6 @@
 import { Head, router } from "@inertiajs/react";
 import { useState, useMemo } from "react";
 import AppLayout from "../../../Layouts/AppLayout";
-import { CheckboxList, PickerModal } from "../../../Components/CheckboxPicker";
 
 const TRAINING_TYPES = [
     { value: "primary",   label: "Первичное" },
@@ -10,7 +9,73 @@ const TRAINING_TYPES = [
     { value: "special",   label: "Специальное" },
 ];
 
-const READING_MINUTES = [5, 10, 15, 20, 30, 45, 60];
+function EditModal({ item, onClose }) {
+    const [form, setForm]     = useState({
+        training_type:            item.training_type,
+        is_mandatory:             item.is_mandatory,
+        required_reading_minutes: item.required_reading_minutes,
+    });
+    const [saving, setSaving] = useState(false);
+    const [errors, setErrors] = useState({});
+
+    function submit(e) {
+        e.preventDefault();
+        setSaving(true);
+        router.patch(route("admin.matrix.update", item.id), form, {
+            preserveScroll: true,
+            onSuccess: onClose,
+            onError: setErrors,
+            onFinish: () => setSaving(false),
+        });
+    }
+
+    return (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-sm mx-4 shadow-xl">
+                <h3 className="text-base font-semibold text-gray-900 mb-1">Редактировать запись</h3>
+                <p className="text-sm text-gray-400 mb-4">{item.document}</p>
+
+                <form onSubmit={submit} className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Вид обучения</label>
+                        <select value={form.training_type}
+                            onChange={(e) => setForm({ ...form, training_type: e.target.value })}
+                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            {TRAINING_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Время изучения (мин)</label>
+                        <input type="number" min="1" max="9999"
+                            value={form.required_reading_minutes}
+                            onChange={(e) => setForm({ ...form, required_reading_minutes: parseInt(e.target.value) || 1 })}
+                            className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.required_reading_minutes ? "border-red-300" : "border-gray-200"}`} />
+                        {errors.required_reading_minutes && <p className="mt-1 text-xs text-red-600">{errors.required_reading_minutes}</p>}
+                    </div>
+
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                        <input type="checkbox" checked={form.is_mandatory}
+                            onChange={(e) => setForm({ ...form, is_mandatory: e.target.checked })}
+                            className="w-4 h-4 accent-blue-600" />
+                        Обязательное
+                    </label>
+
+                    <div className="flex gap-2 pt-1">
+                        <button type="submit" disabled={saving}
+                            className="flex-1 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                            {saving ? "Сохраняем..." : "Сохранить"}
+                        </button>
+                        <button type="button" onClick={onClose}
+                            className="flex-1 px-4 py-2 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">
+                            Отмена
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
 
 function ApplyMatrixButton() {
     const [loading, setLoading] = useState(false);
@@ -21,26 +86,142 @@ function ApplyMatrixButton() {
     }
     return (
         <button onClick={apply} disabled={loading}
-            className="px-4 py-2 border border-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-50 disabled:opacity-50">
+            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50">
             {loading ? "Применяем..." : "Применить матрицу к сотрудникам"}
         </button>
     );
 }
 
-// Второстепенное, «пакетное» действие: привязать документ(ы) сразу к нескольким должностям.
-// Основной сценарий экрана — точечная настройка одной должности в панели справа.
-function BulkApplyModal({ positions, documents, departments, onClose }) {
-    const [departmentId,   setDepartmentId]   = useState("");
-    const [selectedPosIds, setSelectedPosIds] = useState([]);
-    const [selectedDocIds, setSelectedDocIds] = useState([]);
-    const [trainingType,   setTrainingType]   = useState("primary");
-    const [readingMinutes, setReadingMinutes] = useState(10);
-    const [isMandatory,    setIsMandatory]    = useState(true);
-    const [posSearch,      setPosSearch]      = useState("");
-    const [docSearch,      setDocSearch]      = useState("");
-    const [saving,         setSaving]         = useState(false);
-    const [errors,         setErrors]         = useState({});
-    const [expanded,       setExpanded]       = useState(null); // 'positions' | 'documents' | null
+function SelectableRow({ item, checked, onToggle, renderItem, large }) {
+    return (
+        <label
+            className={`flex items-start gap-3 cursor-pointer hover:bg-gray-50 border-b border-gray-100 last:border-0 ${large ? "px-4 py-3 text-sm" : "px-3 py-2.5 text-sm"} ${checked ? "bg-blue-50" : ""}`}>
+            <input type="checkbox" checked={checked} onChange={onToggle}
+                className={`mt-0.5 accent-blue-600 shrink-0 ${large ? "w-5 h-5" : "w-4 h-4"}`} />
+            <span className="leading-snug">{renderItem(item)}</span>
+        </label>
+    );
+}
+
+function CheckboxList({ items, selectedIds, onToggle, onToggleAll, search, onSearch, searchPlaceholder, renderItem, emptyText, error, onExpand }) {
+    const allSelected = items.length > 0 && items.every((i) => selectedIds.includes(i.id));
+    return (
+        <div>
+            <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-medium text-gray-600">
+                    {selectedIds.length > 0 && (
+                        <span className="text-blue-600">({selectedIds.length} выбрано)</span>
+                    )}
+                </span>
+                <div className="flex items-center gap-3">
+                    {items.length > 0 && (
+                        <button type="button" onClick={() => onToggleAll(allSelected, items)}
+                            className="text-xs text-blue-500 hover:text-blue-700">
+                            {allSelected ? "Снять все" : "Выбрать все"}
+                        </button>
+                    )}
+                    <button type="button" onClick={onExpand}
+                        className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                        </svg>
+                        Развернуть
+                    </button>
+                </div>
+            </div>
+            <input type="text" value={search} onChange={(e) => onSearch(e.target.value)}
+                placeholder={searchPlaceholder}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            {items.length === 0 ? (
+                <p className="text-sm text-gray-400 py-6 text-center">{search ? "Ничего не найдено" : emptyText}</p>
+            ) : (
+                <div className={`border rounded-lg overflow-hidden max-h-80 overflow-y-auto ${error ? "border-red-300" : "border-gray-200"}`}>
+                    {items.map((item) => (
+                        <SelectableRow key={item.id} item={item} checked={selectedIds.includes(item.id)}
+                            onToggle={() => onToggle(item.id)} renderItem={renderItem} />
+                    ))}
+                </div>
+            )}
+            {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+        </div>
+    );
+}
+
+function PickerModal({ title, items, selectedIds, onToggle, onToggleAll, renderItem, matchesSearch, searchPlaceholder, emptyText, onClose }) {
+    const [search, setSearch] = useState("");
+
+    const filtered = useMemo(() => {
+        if (!search.trim()) return items;
+        return items.filter((i) => matchesSearch(i, search));
+    }, [items, search, matchesSearch]);
+
+    const allFilteredSelected = filtered.length > 0 && filtered.every((i) => selectedIds.includes(i.id));
+
+    return (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
+            <div className="bg-white rounded-2xl w-full max-w-2xl h-[85vh] shadow-xl flex flex-col" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+                    <div>
+                        <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                            {selectedIds.length > 0 ? `Выбрано: ${selectedIds.length}` : "Ничего не выбрано"}
+                        </p>
+                    </div>
+                    <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div className="px-6 py-3 border-b border-gray-100 shrink-0 flex items-center gap-3">
+                    <input type="text" autoFocus value={search} onChange={(e) => setSearch(e.target.value)}
+                        placeholder={searchPlaceholder}
+                        className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    {filtered.length > 0 && (
+                        <button type="button" onClick={() => onToggleAll(allFilteredSelected, filtered)}
+                            className="shrink-0 text-sm text-blue-600 hover:text-blue-800 font-medium whitespace-nowrap">
+                            {allFilteredSelected ? "Снять все" : `Выбрать все (${filtered.length})`}
+                        </button>
+                    )}
+                </div>
+
+                <div className="flex-1 overflow-y-auto">
+                    {filtered.length === 0 ? (
+                        <p className="text-sm text-gray-400 py-12 text-center">
+                            {search ? "Ничего не найдено" : emptyText}
+                        </p>
+                    ) : (
+                        filtered.map((item) => (
+                            <SelectableRow key={item.id} item={item} checked={selectedIds.includes(item.id)}
+                                onToggle={() => onToggle(item.id)} renderItem={renderItem} large />
+                        ))
+                    )}
+                </div>
+
+                <div className="px-6 py-4 border-t border-gray-100 shrink-0 flex justify-end">
+                    <button type="button" onClick={onClose}
+                        className="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">
+                        Готово{selectedIds.length > 0 ? ` (${selectedIds.length})` : ""}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function AddForm({ positions, documents, departments }) {
+    const [departmentId,     setDepartmentId]   = useState("");
+    const [selectedPosIds,   setSelectedPosIds] = useState([]);
+    const [selectedDocIds,   setSelectedDocIds] = useState([]);
+    const [trainingType,     setTrainingType]   = useState("primary");
+    const [readingMinutes,   setReadingMinutes] = useState(10);
+    const [isMandatory,      setIsMandatory]    = useState(true);
+    const [posSearch,        setPosSearch]      = useState("");
+    const [docSearch,        setDocSearch]      = useState("");
+    const [saving,           setSaving]         = useState(false);
+    const [errors,           setErrors]         = useState({});
+    const [expanded,         setExpanded]       = useState(null); // 'positions' | 'documents' | null
 
     function handleDepartmentChange(id) {
         setDepartmentId(id);
@@ -70,12 +251,15 @@ function BulkApplyModal({ positions, documents, departments, onClose }) {
     function togglePos(id) {
         setSelectedPosIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
     }
+
     function toggleAllPos(allSelected, items) {
         setSelectedPosIds(allSelected ? [] : items.map((i) => i.id));
     }
+
     function toggleDoc(id) {
         setSelectedDocIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
     }
+
     function toggleAllDoc(allSelected, items) {
         setSelectedDocIds(allSelected ? [] : items.map((i) => i.id));
     }
@@ -97,7 +281,7 @@ function BulkApplyModal({ positions, documents, departments, onClose }) {
             required_reading_minutes: readingMinutes,
         }, {
             preserveScroll: true,
-            onSuccess: onClose,
+            onSuccess: () => { setSelectedPosIds([]); setSelectedDocIds([]); setPosSearch(""); setDocSearch(""); },
             onError: setErrors,
             onFinish: () => setSaving(false),
         });
@@ -106,399 +290,273 @@ function BulkApplyModal({ positions, documents, departments, onClose }) {
     const total = selectedPosIds.length * selectedDocIds.length;
 
     return (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
-            <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] shadow-xl flex flex-col" onClick={(e) => e.stopPropagation()}>
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
-                    <div>
-                        <h3 className="text-base font-semibold text-gray-900">Массовое применение</h3>
-                        <p className="text-xs text-gray-400 mt-0.5">Привязать один или несколько документов сразу к нескольким должностям</p>
-                    </div>
-                    <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
+        <div className="bg-white rounded-xl border border-gray-100 p-5 sticky top-6">
+            <h2 className="text-sm font-semibold text-gray-700 mb-4">Добавить записи в матрицу</h2>
+
+            <form onSubmit={submit} className="space-y-4">
+                <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Отдел (фильтр)</label>
+                    <select value={departmentId} onChange={(e) => handleDepartmentChange(e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">— Все отделы —</option>
+                        {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
                 </div>
 
-                <form onSubmit={submit} className="px-6 py-4 space-y-4 overflow-y-auto">
-                    <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Отдел (фильтр)</label>
-                        <select value={departmentId} onChange={(e) => handleDepartmentChange(e.target.value)}
-                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="">— Все отделы —</option>
-                            {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                            Должности *{selectedPosIds.length > 0 && <span className="ml-1 text-blue-600">({selectedPosIds.length})</span>}
-                        </label>
-                        <CheckboxList
-                            items={availablePositions}
+                <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Должности *{selectedPosIds.length > 0 && <span className="ml-1 text-blue-600">({selectedPosIds.length})</span>}
+                    </label>
+                    <CheckboxList
+                        items={availablePositions}
+                        selectedIds={selectedPosIds}
+                        onToggle={togglePos}
+                        onToggleAll={toggleAllPos}
+                        search={posSearch}
+                        onSearch={setPosSearch}
+                        searchPlaceholder="Поиск должности..."
+                        renderItem={(p) => (
+                            <span className="font-medium text-gray-800">
+                                {p.name}
+                                {p.department && <span className="ml-1.5 font-normal text-gray-400">({p.department})</span>}
+                            </span>
+                        )}
+                        emptyText="Нет должностей"
+                        error={errors.position_ids}
+                        onExpand={() => setExpanded("positions")}
+                    />
+                    {expanded === "positions" && (
+                        <PickerModal
+                            title={departmentId
+                                ? `Должности — ${departments.find((d) => d.id === Number(departmentId))?.name ?? ""}`
+                                : "Все должности"}
+                            items={positionsInDept}
                             selectedIds={selectedPosIds}
                             onToggle={togglePos}
                             onToggleAll={toggleAllPos}
-                            search={posSearch}
-                            onSearch={setPosSearch}
-                            searchPlaceholder="Поиск должности..."
                             renderItem={(p) => (
-                                <span className="font-medium text-gray-800">
-                                    {p.name}
-                                    {p.department && <span className="ml-1.5 font-normal text-gray-400">({p.department})</span>}
-                                </span>
-                            )}
-                            emptyText="Нет должностей"
-                            error={errors.position_ids}
-                            onExpand={() => setExpanded("positions")}
-                        />
-                        {expanded === "positions" && (
-                            <PickerModal
-                                title={departmentId
-                                    ? `Должности — ${departments.find((d) => d.id === Number(departmentId))?.name ?? ""}`
-                                    : "Все должности"}
-                                items={positionsInDept}
-                                selectedIds={selectedPosIds}
-                                onToggle={togglePos}
-                                onToggleAll={toggleAllPos}
-                                renderItem={(p) => (
-                                    <span className="font-medium text-gray-800">
-                                        {p.name}
-                                        {p.department && <span className="ml-1.5 font-normal text-gray-400">({p.department})</span>}
-                                    </span>
-                                )}
-                                matchesSearch={(p, q) => p.name.toLowerCase().includes(q.toLowerCase())}
-                                searchPlaceholder="Поиск должности..."
-                                emptyText="Нет должностей"
-                                onClose={() => setExpanded(null)}
-                            />
+                            <span className="font-medium text-gray-800">
+                                {p.name}
+                                {p.department && <span className="ml-1.5 font-normal text-gray-400">({p.department})</span>}
+                            </span>
                         )}
-                    </div>
+                            matchesSearch={(p, q) => p.name.toLowerCase().includes(q.toLowerCase())}
+                            searchPlaceholder="Поиск должности..."
+                            emptyText="Нет должностей"
+                            onClose={() => setExpanded(null)}
+                        />
+                    )}
+                </div>
 
-                    <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                            Документы *{selectedDocIds.length > 0 && <span className="ml-1 text-blue-600">({selectedDocIds.length})</span>}
-                        </label>
-                        <CheckboxList
-                            items={availableDocs}
+                <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Документы *{selectedDocIds.length > 0 && <span className="ml-1 text-blue-600">({selectedDocIds.length})</span>}
+                    </label>
+                    <CheckboxList
+                        items={availableDocs}
+                        selectedIds={selectedDocIds}
+                        onToggle={toggleDoc}
+                        onToggleAll={toggleAllDoc}
+                        search={docSearch}
+                        onSearch={setDocSearch}
+                        searchPlaceholder="Поиск документа..."
+                        renderItem={(d) => (
+                            <>
+                                <span className="font-medium text-gray-800">{d.title}</span>
+                                <span className="block text-xs text-gray-400">{d.description}</span>
+                            </>
+                        )}
+                        emptyText="Нет документов"
+                        error={errors.document_ids}
+                        onExpand={() => setExpanded("documents")}
+                    />
+                    {expanded === "documents" && (
+                        <PickerModal
+                            title="Все документы"
+                            items={documents}
                             selectedIds={selectedDocIds}
                             onToggle={toggleDoc}
                             onToggleAll={toggleAllDoc}
-                            search={docSearch}
-                            onSearch={setDocSearch}
-                            searchPlaceholder="Поиск документа..."
                             renderItem={(d) => (
                                 <>
                                     <span className="font-medium text-gray-800">{d.title}</span>
                                     <span className="block text-xs text-gray-400">{d.description}</span>
                                 </>
                             )}
+                            matchesSearch={(d, q) => {
+                                const needle = q.toLowerCase();
+                                return d.title.toLowerCase().includes(needle) || d.description.toLowerCase().includes(needle);
+                            }}
+                            searchPlaceholder="Поиск документа..."
                             emptyText="Нет документов"
-                            error={errors.document_ids}
-                            onExpand={() => setExpanded("documents")}
+                            onClose={() => setExpanded(null)}
                         />
-                        {expanded === "documents" && (
-                            <PickerModal
-                                title="Все документы"
-                                items={documents}
-                                selectedIds={selectedDocIds}
-                                onToggle={toggleDoc}
-                                onToggleAll={toggleAllDoc}
-                                renderItem={(d) => (
-                                    <>
-                                        <span className="font-medium text-gray-800">{d.title}</span>
-                                        <span className="block text-xs text-gray-400">{d.description}</span>
-                                    </>
-                                )}
-                                matchesSearch={(d, q) => {
-                                    const needle = q.toLowerCase();
-                                    return d.title.toLowerCase().includes(needle) || d.description.toLowerCase().includes(needle);
-                                }}
-                                searchPlaceholder="Поиск документа..."
-                                emptyText="Нет документов"
-                                onClose={() => setExpanded(null)}
-                            />
-                        )}
-                    </div>
+                    )}
+                </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Вид обучения</label>
-                            <select value={trainingType} onChange={(e) => setTrainingType(e.target.value)}
-                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                {TRAINING_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Время изучения</label>
-                            <select value={readingMinutes} onChange={(e) => setReadingMinutes(parseInt(e.target.value))}
-                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                {READING_MINUTES.map((m) => <option key={m} value={m}>{m} мин</option>)}
-                            </select>
-                        </div>
-                    </div>
-
-                    <label className="flex items-center gap-2 text-sm text-gray-700">
-                        <input type="checkbox" checked={isMandatory} onChange={(e) => setIsMandatory(e.target.checked)}
-                            className="w-4 h-4 accent-blue-600" />
-                        Обязательное
-                    </label>
-
-                    <div className="flex gap-3 pt-1">
-                        <button type="submit" disabled={saving || total === 0}
-                            className="flex-1 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                            {saving
-                                ? "Применяем..."
-                                : total > 0
-                                    ? `Применить (${total} запис${total === 1 ? "ь" : total < 5 ? "и" : "ей"})`
-                                    : "Выберите должности и документы"}
-                        </button>
-                        <button type="button" onClick={onClose}
-                            className="px-4 py-2 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">
-                            Отмена
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    );
-}
-
-function PositionsPanel({ positions, countByPosition, departments, deptFilter, setDeptFilter, search, setSearch, selectedId, onSelect }) {
-    const filtered = useMemo(() => positions
-        .filter((p) => !deptFilter || String(p.department_id) === String(deptFilter))
-        .filter((p) => !search.trim() || p.name.toLowerCase().includes(search.trim().toLowerCase())),
-        [positions, deptFilter, search]
-    );
-
-    return (
-        <div className="bg-white rounded-xl border border-gray-100 flex flex-col h-[75vh]">
-            <div className="p-4 border-b border-gray-100 space-y-2 shrink-0">
-                <h2 className="text-sm font-semibold text-gray-700">Должности</h2>
-                <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}
-                    className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">Все отделы</option>
-                    {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-                </select>
-                <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Поиск должности..."
-                    className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-            <div className="flex-1 overflow-y-auto">
-                {filtered.length === 0 ? (
-                    <p className="text-sm text-gray-400 py-8 text-center">Ничего не найдено</p>
-                ) : filtered.map((p) => {
-                    const count = countByPosition[p.id] ?? 0;
-                    const active = p.id === selectedId;
-                    return (
-                        <button key={p.id} type="button" onClick={() => onSelect(p.id)}
-                            className={`w-full flex items-center justify-between gap-2 px-4 py-2.5 text-left border-b border-gray-50 last:border-0 transition-colors ${
-                                active ? "bg-indigo-50 border-l-2 border-l-indigo-600" : "hover:bg-gray-50 border-l-2 border-l-transparent"
-                            }`}>
-                            <span className="min-w-0">
-                                <span className={`block text-sm truncate ${active ? "text-indigo-700 font-medium" : "text-gray-800"}`}>{p.name}</span>
-                                {p.department && <span className="block text-xs text-gray-400 truncate">{p.department}</span>}
-                            </span>
-                            <span className={`shrink-0 text-xs px-1.5 py-0.5 rounded-full ${
-                                count > 0 ? "bg-indigo-100 text-indigo-700" : "bg-gray-100 text-gray-400"
-                            }`}>{count}</span>
-                        </button>
-                    );
-                })}
-            </div>
-        </div>
-    );
-}
-
-function RequirementRow({ document, matrixRow, defaults, onAdd, onRemove, onUpdate, saving }) {
-    const required = !!matrixRow;
-    return (
-        <div className={`flex items-start gap-3 px-4 py-3 border-b border-gray-50 last:border-0 ${required ? "bg-indigo-50/40" : ""}`}>
-            <input type="checkbox" checked={required} disabled={saving}
-                onChange={() => required ? onRemove(matrixRow.id, document.id) : onAdd(document.id)}
-                className="mt-1 w-4 h-4 accent-indigo-600 shrink-0" />
-            <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800">{document.title}</p>
-                <p className="text-xs text-gray-400">{document.description}</p>
-
-                {required && (
-                    <div className="flex flex-wrap items-center gap-2 mt-2">
-                        <select value={matrixRow.training_type} disabled={saving}
-                            onChange={(e) => onUpdate(matrixRow.id, document.id, { training_type: e.target.value })}
-                            className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                            {TRAINING_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                        </select>
-                        <select value={matrixRow.required_reading_minutes} disabled={saving}
-                            onChange={(e) => onUpdate(matrixRow.id, document.id, { required_reading_minutes: parseInt(e.target.value) })}
-                            className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                            {READING_MINUTES.map((m) => <option key={m} value={m}>{m} мин</option>)}
-                        </select>
-                        <label className="flex items-center gap-1 text-xs text-gray-500">
-                            <input type="checkbox" checked={matrixRow.is_mandatory} disabled={saving}
-                                onChange={(e) => onUpdate(matrixRow.id, document.id, { is_mandatory: e.target.checked })}
-                                className="w-3.5 h-3.5 accent-indigo-600" />
-                            Обязательное
-                        </label>
-                    </div>
-                )}
-            </div>
-            {saving && (
-                <svg className="w-4 h-4 text-gray-300 animate-spin shrink-0 mt-1" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                </svg>
-            )}
-        </div>
-    );
-}
-
-function RequirementsPanel({ position, documents, rows }) {
-    const [docSearch, setDocSearch] = useState("");
-    const [savingDocId, setSavingDocId] = useState(null);
-    const [defaultType, setDefaultType] = useState("primary");
-    const [defaultMinutes, setDefaultMinutes] = useState(10);
-
-    const rowByDocId = useMemo(() => Object.fromEntries(rows.map((r) => [r.document_id, r])), [rows]);
-
-    const filteredDocs = useMemo(() => documents.filter((d) =>
-        !docSearch.trim() ||
-        d.title.toLowerCase().includes(docSearch.toLowerCase()) ||
-        d.description.toLowerCase().includes(docSearch.toLowerCase())
-    ), [documents, docSearch]);
-
-    function addRequirement(documentId) {
-        if (!position) return;
-        setSavingDocId(documentId);
-        router.post(route("admin.matrix.store"), {
-            position_ids:             [position.id],
-            document_ids:             [documentId],
-            training_type:            defaultType,
-            is_mandatory:             true,
-            required_reading_minutes: defaultMinutes,
-        }, {
-            preserveScroll: true, preserveState: true, only: ["matrix"],
-            onFinish: () => setSavingDocId(null),
-        });
-    }
-
-    function removeRequirement(matrixId, documentId) {
-        setSavingDocId(documentId);
-        router.delete(route("admin.matrix.destroy", matrixId), {
-            preserveScroll: true, preserveState: true, only: ["matrix"],
-            onFinish: () => setSavingDocId(null),
-        });
-    }
-
-    function updateRequirement(matrixId, documentId, patch) {
-        setSavingDocId(documentId);
-        router.patch(route("admin.matrix.update", matrixId), patch, {
-            preserveScroll: true, preserveState: true, only: ["matrix"],
-            onFinish: () => setSavingDocId(null),
-        });
-    }
-
-    if (!position) {
-        return (
-            <div className="bg-white rounded-xl border border-gray-100 h-[75vh] flex items-center justify-center">
-                <p className="text-sm text-gray-400">Выберите должность слева, чтобы настроить требуемые документы</p>
-            </div>
-        );
-    }
-
-    return (
-        <div className="bg-white rounded-xl border border-gray-100 flex flex-col h-[75vh]">
-            <div className="p-4 border-b border-gray-100 shrink-0">
-                <h2 className="text-sm font-semibold text-gray-900">{position.name}</h2>
-                <p className="text-xs text-gray-400 mt-0.5">
-                    {position.department && `${position.department} · `}Требуется документов: {rows.length}
-                </p>
-
-                <div className="flex flex-wrap items-center gap-2 mt-3">
-                    <span className="text-xs text-gray-500">Для новых отметок:</span>
-                    <select value={defaultType} onChange={(e) => setDefaultType(e.target.value)}
-                        className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Вид обучения</label>
+                    <select value={trainingType} onChange={(e) => setTrainingType(e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                         {TRAINING_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                    </select>
-                    <select value={defaultMinutes} onChange={(e) => setDefaultMinutes(parseInt(e.target.value))}
-                        className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                        {READING_MINUTES.map((m) => <option key={m} value={m}>{m} мин</option>)}
                     </select>
                 </div>
 
-                <input type="text" value={docSearch} onChange={(e) => setDocSearch(e.target.value)}
-                    placeholder="Поиск документа..."
-                    className="w-full mt-3 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-            </div>
+                <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Время изучения (мин)</label>
+                    <input type="number" min="1" max="9999" value={readingMinutes}
+                        onChange={(e) => setReadingMinutes(parseInt(e.target.value) || 1)}
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
 
-            <div className="flex-1 overflow-y-auto">
-                {filteredDocs.length === 0 ? (
-                    <p className="text-sm text-gray-400 py-8 text-center">Ничего не найдено</p>
-                ) : filteredDocs.map((d) => (
-                    <RequirementRow key={d.id} document={d} matrixRow={rowByDocId[d.id]}
-                        onAdd={addRequirement} onRemove={removeRequirement} onUpdate={updateRequirement}
-                        saving={savingDocId === d.id} />
-                ))}
-            </div>
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input type="checkbox" checked={isMandatory} onChange={(e) => setIsMandatory(e.target.checked)}
+                        className="w-4 h-4 accent-blue-600" />
+                    Обязательное
+                </label>
+
+                <button type="submit" disabled={saving || total === 0}
+                    className="w-full px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                    {saving
+                        ? "Добавляем..."
+                        : total > 0
+                            ? `Добавить ${total} запис${total === 1 ? "ь" : total < 5 ? "и" : "ей"}`
+                            : "Выберите должности и документы"}
+                </button>
+            </form>
         </div>
     );
 }
 
 export default function MatrixIndex({ matrix, positions, documents, departments }) {
-    const [deptFilter,   setDeptFilter]   = useState("");
-    const [posSearch,    setPosSearch]    = useState("");
-    const [selectedId,   setSelectedId]   = useState(null);
-    const [showBulk,     setShowBulk]     = useState(false);
+    const [filterDept, setFilterDept] = useState("");
+    const [filterPos,  setFilterPos]  = useState("");
+    const [editItem,   setEditItem]   = useState(null);
 
-    const countByPosition = useMemo(() => {
-        const map = {};
-        matrix.forEach((m) => { map[m.position_id] = (map[m.position_id] ?? 0) + 1; });
-        return map;
-    }, [matrix]);
+    function remove(id) {
+        if (confirm("Удалить запись из матрицы?")) {
+            router.delete(route("admin.matrix.destroy", id), { preserveScroll: true });
+        }
+    }
 
-    const selectedPosition = positions.find((p) => p.id === selectedId) ?? null;
-    const rowsForSelected  = useMemo(() =>
-        selectedId ? matrix.filter((m) => m.position_id === selectedId) : [],
-        [matrix, selectedId]
+    function handleFilterDeptChange(id) {
+        setFilterDept(id);
+        setFilterPos("");
+    }
+
+    const filteredPositionsForFilter = useMemo(() =>
+        filterDept ? positions.filter((p) => p.department_id === Number(filterDept)) : positions,
+        [filterDept, positions]
     );
+
+    const filtered = useMemo(() => matrix.filter((m) => {
+        if (filterDept && m.department_id !== Number(filterDept)) return false;
+        if (filterPos  && m.position_id  !== Number(filterPos))  return false;
+        return true;
+    }), [matrix, filterDept, filterPos]);
+
+    const grouped = filtered.reduce((acc, m) => {
+        const key = m.department ?? "Без отдела";
+        acc[key] = acc[key] ?? [];
+        acc[key].push(m);
+        return acc;
+    }, {});
 
     return (
         <AppLayout title="Матрица обучения">
             <Head title="Матрица обучения" />
 
-            {showBulk && (
-                <BulkApplyModal positions={positions} documents={documents} departments={departments}
-                    onClose={() => setShowBulk(false)} />
-            )}
-
-            <div className="flex items-center gap-3 mb-6 flex-wrap">
-                <p className="text-sm text-gray-500">
-                    {matrix.length} правил · {positions.length} должностей
-                </p>
-                <div className="ml-auto flex gap-2">
-                    <ApplyMatrixButton />
-                    <button onClick={() => setShowBulk(true)}
-                        className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700">
-                        Массовое применение
-                    </button>
-                </div>
-            </div>
+            {editItem && <EditModal item={editItem} onClose={() => setEditItem(null)} />}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-1">
-                    <PositionsPanel
-                        positions={positions}
-                        countByPosition={countByPosition}
-                        departments={departments}
-                        deptFilter={deptFilter}
-                        setDeptFilter={setDeptFilter}
-                        search={posSearch}
-                        setSearch={setPosSearch}
-                        selectedId={selectedId}
-                        onSelect={setSelectedId}
-                    />
+                    <AddForm positions={positions} documents={documents} departments={departments} />
                 </div>
+
                 <div className="lg:col-span-2">
-                    <RequirementsPanel position={selectedPosition} documents={documents} rows={rowsForSelected} />
+                    <div className="flex items-center gap-3 mb-4 flex-wrap">
+                        <p className="text-sm text-gray-500">
+                            {filtered.length !== matrix.length
+                                ? <>{filtered.length} <span className="text-gray-400">из {matrix.length}</span></>
+                                : <>{matrix.length} записей</>
+                            }
+                        </p>
+                        <ApplyMatrixButton />
+                        <div className="ml-auto flex gap-2">
+                            <select value={filterDept} onChange={(e) => handleFilterDeptChange(e.target.value)}
+                                className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Все отделы</option>
+                                {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                            </select>
+                            <select value={filterPos} onChange={(e) => setFilterPos(e.target.value ? Number(e.target.value) : "")}
+                                className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Все должности</option>
+                                {filteredPositionsForFilter.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                        </div>
+                    </div>
+
+                    {Object.entries(grouped).map(([dept, rows]) => (
+                        <div key={dept} className="mb-6">
+                            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">{dept}</h3>
+                            <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-gray-50 border-b border-gray-100">
+                                        <tr>
+                                            <th className="text-left px-4 py-2 font-medium text-gray-500">Должность</th>
+                                            <th className="text-left px-4 py-2 font-medium text-gray-500">Документ</th>
+                                            <th className="text-left px-4 py-2 font-medium text-gray-500">Вид</th>
+                                            <th className="text-left px-4 py-2 font-medium text-gray-500">Время</th>
+                                            <th className="text-center px-4 py-2 font-medium text-gray-500">Обяз.</th>
+                                            <th className="px-4 py-2" />
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-50">
+                                        {rows.map((m) => (
+                                            <tr key={m.id} className="hover:bg-gray-50 transition-colors">
+                                                <td className="px-4 py-2.5 text-gray-700">{m.position}</td>
+                                                <td className="px-4 py-2.5 text-gray-600">
+                                                    {m.document_code && (
+                                                        <span className="text-xs font-medium text-gray-400 mr-1.5">{m.document_code}</span>
+                                                    )}
+                                                    {m.document}
+                                                </td>
+                                                <td className="px-4 py-2.5">
+                                                    <span className="text-xs text-gray-500">
+                                                        {TRAINING_TYPES.find((t) => t.value === m.training_type)?.label ?? m.training_type}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-2.5 text-xs text-gray-500">{m.required_reading_minutes} мин</td>
+                                                <td className="px-4 py-2.5 text-center">
+                                                    {m.is_mandatory
+                                                        ? <span className="text-green-600 text-xs">✓</span>
+                                                        : <span className="text-gray-300 text-xs">—</span>}
+                                                </td>
+                                                <td className="px-4 py-2.5 text-right">
+                                                    <div className="flex items-center justify-end gap-3">
+                                                        <button onClick={() => setEditItem(m)}
+                                                            className="text-xs text-blue-500 hover:text-blue-700">
+                                                            Изменить
+                                                        </button>
+                                                        <button onClick={() => remove(m.id)}
+                                                            className="text-xs text-red-400 hover:text-red-600">
+                                                            Удалить
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    ))}
+
+                    {filtered.length === 0 && (
+                        <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
+                            <p className="text-gray-400 text-sm">Матрица пуста</p>
+                        </div>
+                    )}
                 </div>
             </div>
         </AppLayout>
