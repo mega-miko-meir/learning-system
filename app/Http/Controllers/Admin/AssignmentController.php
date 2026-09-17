@@ -9,8 +9,10 @@ use App\Models\Document;
 use App\Models\Position;
 use App\Models\TestAttempt;
 use App\Models\TrainingAssignment;
+use App\Models\TrainingMatrix;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 
@@ -44,62 +46,80 @@ class AssignmentController extends Controller
         $positions   = Position::active()->with('department')->orderBy('name')
             ->get(['id', 'name', 'department_id']);
         $documents   = Document::active()->orderBy('description')->get(['id', 'title', 'description']);
+        $employees   = User::active()
+            ->whereIn('role', ['employee', 'hr_admin', 'manager'])
+            ->with(['department', 'position'])
+            ->orderBy('last_name')
+            ->get()
+            ->map(fn($u) => [
+                'id'            => $u->id,
+                'name'          => $u->full_name,
+                'position_id'   => $u->position_id,
+                'department_id' => $u->department_id,
+                'department'    => $u->department?->name,
+                'position'      => $u->position?->name,
+            ]);
 
         return Inertia::render('Admin/Assignments/Index', compact(
-            'assignments', 'departments', 'positions', 'documents'
+            'assignments', 'departments', 'positions', 'documents', 'employees'
         ));
     }
 
     public function assignBulk(Request $request)
     {
         $data = $request->validate([
-            'position_id'      => ['required', 'exists:positions,id'],
+            'user_ids'         => ['required', 'array', 'min:1'],
+            'user_ids.*'       => ['exists:users,id'],
             'document_id'      => ['required', 'exists:documents,id'],
             'training_type'    => ['required', 'in:primary,periodic,unplanned,special'],
             'due_date'         => ['nullable', 'date', 'after:today'],
             'reading_minutes'  => ['required', 'integer', 'in:5,10,15,20,30,45,60'],
         ]);
 
-        $userIds = User::active()
-            ->whereIn('role', ['employee', 'hr_admin', 'manager'])
-            ->where('position_id', $data['position_id'])
-            ->pluck('id');
-
-        if ($userIds->isEmpty()) {
-            return back()->with('info', 'На данной должности нет активных сотрудников.');
-        }
-
         $created = 0;
-        foreach ($userIds as $userId) {
+        $skipped = 0;
+
+        foreach ($data['user_ids'] as $userId) {
+            $user = User::find($userId);
+
             $exists = TrainingAssignment::where('user_id', $userId)
                 ->where('document_id', $data['document_id'])
                 ->whereNotIn('status', ['completed', 'failed', 'expired'])
                 ->exists();
 
-            if (!$exists) {
-                $assignment = TrainingAssignment::create([
-                    'user_id'                  => $userId,
-                    'document_id'              => $data['document_id'],
-                    'training_type'            => $data['training_type'],
-                    'status'                   => 'pending',
-                    'due_date'                 => $data['due_date'] ?? now()->addDays(30),
-                    'required_reading_minutes' => $data['reading_minutes'],
-                ]);
-
-                $employee = User::find($userId);
-                if ($employee?->email) {
-                    try {
-                        Mail::to($employee->email)->queue(new NewTrainingAssigned($assignment->load('document', 'user')));
-                    } catch (\Exception $e) {
-                        \Log::error('Failed to send assignment email: ' . $e->getMessage());
-                    }
-                }
-
-                $created++;
+            if ($exists) {
+                $skipped++;
+                continue;
             }
+
+            $matrixId = $user->position_id
+                ? TrainingMatrix::active()
+                    ->where('position_id', $user->position_id)
+                    ->where('document_id', $data['document_id'])
+                    ->value('id')
+                : null;
+
+            $assignment = TrainingAssignment::create([
+                'user_id'                  => $userId,
+                'document_id'              => $data['document_id'],
+                'matrix_id'                => $matrixId,
+                'training_type'            => $data['training_type'],
+                'status'                   => 'pending',
+                'due_date'                 => $data['due_date'] ?? now()->addDays(30),
+                'required_reading_minutes' => $data['reading_minutes'],
+            ]);
+
+            if ($user?->email) {
+                try {
+                    Mail::to($user->email)->queue(new NewTrainingAssigned($assignment->load('document', 'user')));
+                } catch (\Exception $e) {
+                    Log::error('Failed to send assignment email: ' . $e->getMessage());
+                }
+            }
+
+            $created++;
         }
 
-        $skipped = $userIds->count() - $created;
         $message = "Назначено: {$created} сотрудников.";
         if ($skipped > 0) {
             $message .= " Пропущено (уже есть активное назначение): {$skipped}.";

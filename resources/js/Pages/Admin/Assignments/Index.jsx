@@ -1,7 +1,8 @@
 import { Head, Link, router, useForm } from "@inertiajs/react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import AppLayout from "../../../Layouts/AppLayout";
 import Pagination from "../../../Components/Pagination";
+import { CheckboxList, PickerModal } from "../../../Components/CheckboxPicker";
 
 const STATUS_MAP = {
     pending:     "Ожидает",
@@ -20,7 +21,7 @@ const TRAINING_TYPES = [
 
 const READING_MINUTES = [5, 10, 15, 20, 30, 45, 60];
 
-export default function AssignmentsIndex({ assignments, departments, positions, documents }) {
+export default function AssignmentsIndex({ assignments, departments, positions, documents, employees }) {
     const params = Object.fromEntries(new URLSearchParams(window.location.search));
 
     // ── Поиск по сотруднику (фронтенд) ───────────────────────────────
@@ -33,11 +34,14 @@ export default function AssignmentsIndex({ assignments, departments, positions, 
         : assignments.data;
 
     // ── Bulk assign form ──────────────────────────────────────────────
-    const [showBulk, setShowBulk]     = useState(false);
-    const [deptFilter, setDeptFilter] = useState("");
+    const [showBulk,     setShowBulk]     = useState(false);
+    const [deptFilter,   setDeptFilter]   = useState("");
+    const [positionId,   setPositionId]   = useState("");
+    const [userSearch,   setUserSearch]   = useState("");
+    const [expandUsers,  setExpandUsers]  = useState(false);
 
     const bulkForm = useForm({
-        position_id:     "",
+        user_ids:        [],
         document_id:     "",
         training_type:   "primary",
         due_date:        "",
@@ -48,6 +52,42 @@ export default function AssignmentsIndex({ assignments, departments, positions, 
         ? positions.filter((p) => String(p.department_id) === String(deptFilter))
         : positions;
 
+    const employeesInScope = useMemo(() => employees
+        .filter((e) => !deptFilter || String(e.department_id) === String(deptFilter))
+        .filter((e) => !positionId || String(e.position_id) === String(positionId)),
+        [employees, deptFilter, positionId]
+    );
+
+    const availableEmployees = useMemo(() => employeesInScope.filter((e) =>
+        !userSearch.trim() || e.name.toLowerCase().includes(userSearch.toLowerCase())
+    ), [employeesInScope, userSearch]);
+
+    function handleDeptChange(id) {
+        setDeptFilter(id);
+        setPositionId("");
+        bulkForm.setData("user_ids", []);
+    }
+
+    function handlePositionChange(id) {
+        setPositionId(id);
+        // Удобный дефолт: выбрали должность — сразу подставили всех, кто на ней. Можно донастроить вручную ниже.
+        bulkForm.setData("user_ids", id
+            ? employees.filter((e) => String(e.position_id) === String(id)).map((e) => e.id)
+            : []
+        );
+    }
+
+    function toggleUser(id) {
+        bulkForm.setData("user_ids", bulkForm.data.user_ids.includes(id)
+            ? bulkForm.data.user_ids.filter((x) => x !== id)
+            : [...bulkForm.data.user_ids, id]
+        );
+    }
+
+    function toggleAllUsers(allSelected, items) {
+        bulkForm.setData("user_ids", allSelected ? [] : items.map((i) => i.id));
+    }
+
     function filter(key, value) {
         router.get(route("admin.assignments.index"), { ...params, [key]: value || undefined }, {
             preserveState: true, replace: true,
@@ -57,7 +97,11 @@ export default function AssignmentsIndex({ assignments, departments, positions, 
     function bulkAssign(e) {
         e.preventDefault();
         bulkForm.post(route("admin.assignments.bulk"), {
-            onSuccess: () => { bulkForm.reset(); setDeptFilter(""); setShowBulk(false); },
+            onSuccess: () => {
+                bulkForm.reset();
+                setDeptFilter(""); setPositionId(""); setUserSearch("");
+                setShowBulk(false);
+            },
         });
     }
 
@@ -168,11 +212,21 @@ export default function AssignmentsIndex({ assignments, departments, positions, 
 
             {/* ── Форма массового назначения ── */}
             {showBulk && (
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-6">
-                    <h3 className="text-sm font-semibold text-blue-800 mb-1">Назначить обучение по должности</h3>
-                    <p className="text-xs text-blue-600 mb-4">
-                        Документ будет назначен всем активным сотрудникам выбранной должности.
-                    </p>
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
+                    <div className="flex items-start gap-3 mb-5">
+                        <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                            <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-semibold text-gray-900">Назначить обучение</h3>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                                Выберите должность — сотрудники подставятся автоматически, при необходимости донастройте список вручную
+                            </p>
+                        </div>
+                    </div>
+
                     <form onSubmit={bulkAssign} className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div>
@@ -181,8 +235,8 @@ export default function AssignmentsIndex({ assignments, departments, positions, 
                                 </label>
                                 <select
                                     value={deptFilter}
-                                    onChange={(e) => { setDeptFilter(e.target.value); bulkForm.setData("position_id", ""); }}
-                                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                    onChange={(e) => handleDeptChange(e.target.value)}
+                                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 >
                                     <option value="">— Все отделы —</option>
                                     {departments.map((d) => (
@@ -192,23 +246,18 @@ export default function AssignmentsIndex({ assignments, departments, positions, 
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-gray-600 mb-1">
-                                    Должность <span className="text-red-500">*</span>
+                                    Должность <span className="text-gray-400 font-normal ml-1">(для фильтра)</span>
                                 </label>
                                 <select
-                                    value={bulkForm.data.position_id}
-                                    onChange={(e) => bulkForm.setData("position_id", e.target.value)}
-                                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white ${
-                                        bulkForm.errors.position_id ? "border-red-300" : "border-gray-200"
-                                    }`}
+                                    value={positionId}
+                                    onChange={(e) => handlePositionChange(e.target.value)}
+                                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 >
-                                    <option value="">— Выберите должность —</option>
+                                    <option value="">— Все должности —</option>
                                     {filteredPositions.map((p) => (
                                         <option key={p.id} value={p.id}>{p.name}</option>
                                     ))}
                                 </select>
-                                {bulkForm.errors.position_id && (
-                                    <p className="mt-1 text-xs text-red-600">{bulkForm.errors.position_id}</p>
-                                )}
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -217,7 +266,7 @@ export default function AssignmentsIndex({ assignments, departments, positions, 
                                 <select
                                     value={bulkForm.data.document_id}
                                     onChange={(e) => bulkForm.setData("document_id", e.target.value)}
-                                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white ${
+                                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                                         bulkForm.errors.document_id ? "border-red-300" : "border-gray-200"
                                     }`}
                                 >
@@ -235,7 +284,7 @@ export default function AssignmentsIndex({ assignments, departments, positions, 
                                 <select
                                     value={bulkForm.data.training_type}
                                     onChange={(e) => bulkForm.setData("training_type", e.target.value)}
-                                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 >
                                     {TRAINING_TYPES.map((t) => (
                                         <option key={t.value} value={t.value}>{t.label}</option>
@@ -243,7 +292,58 @@ export default function AssignmentsIndex({ assignments, departments, positions, 
                                 </select>
                             </div>
                         </div>
-                        <div className="flex items-end gap-4 flex-wrap">
+
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                                Сотрудники <span className="text-red-500">*</span>
+                                {bulkForm.data.user_ids.length > 0 && (
+                                    <span className="ml-1 text-blue-600 font-normal">({bulkForm.data.user_ids.length})</span>
+                                )}
+                            </label>
+                            <CheckboxList
+                                items={availableEmployees}
+                                selectedIds={bulkForm.data.user_ids}
+                                onToggle={toggleUser}
+                                onToggleAll={toggleAllUsers}
+                                search={userSearch}
+                                onSearch={setUserSearch}
+                                searchPlaceholder="Поиск сотрудника..."
+                                renderItem={(e) => (
+                                    <>
+                                        <span className="font-medium text-gray-800">{e.name}</span>
+                                        <span className="block text-xs text-gray-400">
+                                            {[e.position, e.department].filter(Boolean).join(" · ") || "—"}
+                                        </span>
+                                    </>
+                                )}
+                                emptyText="Нет сотрудников"
+                                error={bulkForm.errors.user_ids}
+                                onExpand={() => setExpandUsers(true)}
+                            />
+                            {expandUsers && (
+                                <PickerModal
+                                    title="Все сотрудники"
+                                    items={employeesInScope}
+                                    selectedIds={bulkForm.data.user_ids}
+                                    onToggle={toggleUser}
+                                    onToggleAll={toggleAllUsers}
+                                    renderItem={(e) => (
+                                        <>
+                                            <span className="font-medium text-gray-800">{e.name}</span>
+                                            <span className="block text-xs text-gray-400">
+                                                {[e.position, e.department].filter(Boolean).join(" · ") || "—"}
+                                            </span>
+                                        </>
+                                    )}
+                                    matchesSearch={(e, q) => e.name.toLowerCase().includes(q.toLowerCase())}
+                                    searchPlaceholder="Поиск сотрудника..."
+                                    emptyText="Нет сотрудников"
+                                    onClose={() => setExpandUsers(false)}
+                                />
+                            )}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div>
                                 <label className="block text-xs font-medium text-gray-600 mb-1">
                                     Время изучения <span className="text-red-500">*</span>
@@ -251,7 +351,7 @@ export default function AssignmentsIndex({ assignments, departments, positions, 
                                 <select
                                     value={bulkForm.data.reading_minutes}
                                     onChange={(e) => bulkForm.setData("reading_minutes", parseInt(e.target.value))}
-                                    className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 >
                                     {READING_MINUTES.map((m) => (
                                         <option key={m} value={m}>{m} мин</option>
@@ -264,21 +364,24 @@ export default function AssignmentsIndex({ assignments, departments, positions, 
                                     type="date"
                                     value={bulkForm.data.due_date}
                                     onChange={(e) => bulkForm.setData("due_date", e.target.value)}
-                                    className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
                                 <p className="text-xs text-gray-400 mt-1">Если не указано — 30 дней от сегодня</p>
                             </div>
-                            <div className="flex gap-3 pb-0.5">
+                            <div className="lg:col-span-2 flex items-start gap-3 pt-5">
                                 <button
                                     type="submit"
-                                    disabled={bulkForm.processing || !bulkForm.data.position_id || !bulkForm.data.document_id}
+                                    disabled={bulkForm.processing || bulkForm.data.user_ids.length === 0 || !bulkForm.data.document_id}
                                     className="px-5 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {bulkForm.processing ? "Назначаем..." : "Назначить"}
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => { setShowBulk(false); setDeptFilter(""); bulkForm.reset(); }}
+                                    onClick={() => {
+                                        setShowBulk(false); setDeptFilter(""); setPositionId(""); setUserSearch("");
+                                        bulkForm.reset();
+                                    }}
                                     className="px-5 py-2 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50"
                                 >
                                     Отмена
