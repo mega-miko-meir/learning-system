@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\HR;
 
+use App\Exports\UsersExport;
 use App\Http\Controllers\Controller;
 use App\Mail\AccountCreated;
 use App\Mail\NewEmployeeHired;
@@ -20,6 +21,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
+use Maatwebsite\Excel\Facades\Excel;
 
 class UserController extends Controller
 {
@@ -53,6 +55,18 @@ class UserController extends Controller
         $departments = Department::active()->orderBy('name')->get(['id', 'name']);
 
         return Inertia::render('HR/Users/Index', compact('users', 'departments'));
+    }
+
+    public function export(Request $request)
+    {
+        $export = new UsersExport(
+            departmentId: $request->integer('department_id') ?: null,
+            status:       $request->input('status') ?: null,
+        );
+
+        $filename = 'employees_' . now()->format('Ymd_His') . '.xlsx';
+
+        return Excel::download($export, $filename);
     }
 
     public function create()

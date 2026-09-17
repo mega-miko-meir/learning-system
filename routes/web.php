@@ -72,6 +72,7 @@ Route::middleware(['auth', 'user.active'])->group(function () {
         Route::get('/', [\App\Http\Controllers\Admin\DashboardController::class, 'index'])->name('dashboard');
 
         // Сотрудники (admin тоже может управлять)
+        Route::get('/users/export', [\App\Http\Controllers\Admin\UserController::class, 'export'])->name('users.export');
         Route::resource('users', \App\Http\Controllers\Admin\UserController::class);
         Route::post('/users/{user}/deactivate', [\App\Http\Controllers\Admin\UserController::class, 'deactivate'])->name('users.deactivate');
         Route::post('/users/{user}/activate', [\App\Http\Controllers\Admin\UserController::class, 'activate'])->name('users.activate');
@@ -127,6 +128,7 @@ Route::middleware(['auth', 'user.active'])->group(function () {
         Route::get('/', [\App\Http\Controllers\HR\DashboardController::class, 'index'])->name('dashboard');
 
         // Только управление сотрудниками
+        Route::get('/users/export', [\App\Http\Controllers\HR\UserController::class, 'export'])->name('users.export');
         Route::resource('users', \App\Http\Controllers\HR\UserController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
         Route::post('/users/{user}/deactivate', [\App\Http\Controllers\HR\UserController::class, 'deactivate'])->name('users.deactivate');
         Route::post('/users/{user}/activate', [\App\Http\Controllers\HR\UserController::class, 'activate'])->name('users.activate');
