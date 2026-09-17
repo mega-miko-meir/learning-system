@@ -26,6 +26,7 @@ class SendTrainingReminders extends Command
             ->whereIn('status', ['pending', 'in_progress'])
             ->whereNotNull('due_date')
             ->whereDate('due_date', now()->addDays(7)->toDateString())
+            ->whereHas('user', fn($q) => $q->where('is_active', true))
             ->get();
 
         foreach ($assignments as $a) {
@@ -45,6 +46,7 @@ class SendTrainingReminders extends Command
             ->whereIn('status', ['pending', 'in_progress'])
             ->whereNotNull('due_date')
             ->where('due_date', '<', now())
+            ->whereHas('user', fn($q) => $q->where('is_active', true))
             ->get();
 
         $sent = 0;

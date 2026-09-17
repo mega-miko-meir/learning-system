@@ -20,11 +20,14 @@ class AssignmentController extends Controller
 {
     public function index(Request $request)
     {
+        $activeOnly = $request->boolean('active_only', true);
+
         $assignments = TrainingAssignment::with(['user', 'document'])
             ->when($request->status, fn($q, $s) => $q->where('status', $s))
             ->when($request->department_id, fn($q, $d) =>
                 $q->whereHas('user', fn($u) => $u->where('department_id', $d))
             )
+            ->when($activeOnly, fn($q) => $q->whereHas('user', fn($u) => $u->where('is_active', true)))
             ->latest()
             ->paginate(20)
             ->withQueryString()
@@ -32,6 +35,7 @@ class AssignmentController extends Controller
                 'id'              => $a->id,
                 'user_id'         => $a->user->id,
                 'user'            => $a->user->full_name,
+                'user_is_active'  => $a->user->is_active,
                 'document_id'     => $a->document->id,
                 'document'        => $a->document->display_name,
                 'type'            => $a->training_type,

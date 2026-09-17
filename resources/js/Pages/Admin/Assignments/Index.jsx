@@ -196,6 +196,16 @@ export default function AssignmentsIndex({ assignments, departments, positions, 
                     ))}
                 </select>
 
+                <label className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-200 rounded-lg cursor-pointer select-none bg-white">
+                    <input
+                        type="checkbox"
+                        checked={params.active_only !== "false"}
+                        onChange={(e) => filter("active_only", e.target.checked ? undefined : "false")}
+                        className="w-4 h-4 accent-blue-600"
+                    />
+                    Только активные сотрудники
+                </label>
+
                 {search && (
                     <span className="text-xs text-gray-400">
                         Найдено: {visibleRows.length}
@@ -423,6 +433,9 @@ export default function AssignmentsIndex({ assignments, departments, positions, 
                                         >
                                             {a.user}
                                         </Link>
+                                        {!a.user_is_active && (
+                                            <span className="ml-2 text-xs px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500">уволен</span>
+                                        )}
                                     </td>
                                     <td className="px-4 py-3">
                                         <Link
