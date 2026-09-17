@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exports\PositionsExport;
 use App\Http\Controllers\Controller;
 use App\Models\Department;
 use App\Models\Position;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
+use Maatwebsite\Excel\Facades\Excel;
 
 class PositionController extends Controller
 {
@@ -80,5 +82,14 @@ class PositionController extends Controller
         $position->update(['is_active' => false]);
 
         return back()->with('success', 'Должность деактивирована.');
+    }
+
+    public function export(Request $request)
+    {
+        $export = new PositionsExport(departmentId: $request->integer('department_id') ?: null);
+
+        $filename = 'positions_' . now()->format('Ymd_His') . '.xlsx';
+
+        return Excel::download($export, $filename);
     }
 }

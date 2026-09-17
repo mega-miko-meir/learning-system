@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\HR;
 
+use App\Exports\PositionsExport;
 use App\Http\Controllers\Controller;
 use App\Models\Department;
 use App\Models\Position;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
+use Maatwebsite\Excel\Facades\Excel;
 
 class PositionController extends Controller
 {
@@ -71,5 +73,12 @@ class PositionController extends Controller
         $position->update($data);
 
         return redirect()->route('hr.positions.index')->with('success', 'Должность обновлена.');
+    }
+
+    public function export()
+    {
+        $filename = 'positions_' . now()->format('Ymd_His') . '.xlsx';
+
+        return Excel::download(new PositionsExport, $filename);
     }
 }

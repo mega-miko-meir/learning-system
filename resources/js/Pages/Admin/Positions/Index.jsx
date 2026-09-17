@@ -12,6 +12,10 @@ export default function PositionsIndex({ positions, departments }) {
         [departmentId, positions]
     );
 
+    const exportUrl = departmentId
+        ? route("admin.positions.export") + "?department_id=" + departmentId
+        : route("admin.positions.export");
+
     return (
         <AppLayout title="Должности">
             <Head title="Должности" />
@@ -30,8 +34,16 @@ export default function PositionsIndex({ positions, departments }) {
 
                 <span className="text-sm text-gray-400">{filtered.length} должностей</span>
 
+                <a href={exportUrl}
+                    className="ml-auto flex items-center gap-1.5 px-4 py-2 border border-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-50">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+                    </svg>
+                    Экспорт в Excel
+                </a>
+
                 <Link href={route("admin.positions.create")}
-                    className="ml-auto px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
+                    className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
                     + Добавить должность
                 </Link>
             </div>

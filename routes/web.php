@@ -105,6 +105,7 @@ Route::middleware(['auth', 'user.active'])->group(function () {
 
         // Отделы и должности
         Route::resource('departments', \App\Http\Controllers\Admin\DepartmentController::class);
+        Route::get('/positions/export', [\App\Http\Controllers\Admin\PositionController::class, 'export'])->name('positions.export');
         Route::resource('positions', \App\Http\Controllers\Admin\PositionController::class);
 
         // Audit log
@@ -131,6 +132,7 @@ Route::middleware(['auth', 'user.active'])->group(function () {
 
         // Справочники
         Route::resource('departments', \App\Http\Controllers\HR\DepartmentController::class)->only(['index', 'create', 'store', 'edit', 'update']);
+        Route::get('/positions/export', [\App\Http\Controllers\HR\PositionController::class, 'export'])->name('positions.export');
         Route::resource('positions', \App\Http\Controllers\HR\PositionController::class)->only(['index', 'create', 'store', 'edit', 'update']);
     });
 });
