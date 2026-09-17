@@ -24,6 +24,9 @@ Route::middleware(['auth', 'user.active'])->group(function () {
     // Keepalive — обновляет сессию и CSRF-токен, предотвращает 419 при долгих тестах
     Route::get('/ping', fn () => response()->noContent())->name('ping');
 
+    // Глобальный поиск (Ctrl+K) — доступен всем авторизованным ролям, область видимости внутри контроллера
+    Route::get('/search', [\App\Http\Controllers\SearchController::class, 'index'])->name('search');
+
     // Смена пароля при первом входе
     Route::get('/change-password', [AuthController::class, 'showChangePassword'])->name('password.change');
     Route::post('/change-password', [AuthController::class, 'changePassword'])->name('password.change.post');

@@ -1,6 +1,7 @@
 import { Link, usePage, router } from "@inertiajs/react";
 import { useAuth, useFlash } from "../hooks/useAuth";
 import { useEffect, useState } from "react";
+import CommandPalette from "../Components/CommandPalette";
 
 function Icon({ d, d2 }) {
     return (
@@ -116,10 +117,22 @@ export default function AppLayout({ children, title, fullHeight = false }) {
     const { user } = useAuth();
     const { url } = usePage();
     const navItems = NAV_ITEMS[user?.role] ?? [];
+    const [paletteOpen, setPaletteOpen] = useState(false);
 
     function logout() {
         router.post(route("logout"));
     }
+
+    useEffect(() => {
+        function onKeyDown(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+                e.preventDefault();
+                setPaletteOpen(true);
+            }
+        }
+        window.addEventListener("keydown", onKeyDown);
+        return () => window.removeEventListener("keydown", onKeyDown);
+    }, []);
 
     return (
         <div className="flex h-screen bg-gray-50 overflow-hidden">
@@ -137,6 +150,21 @@ export default function AppLayout({ children, title, fullHeight = false }) {
                         <p className="text-sm font-semibold text-gray-900 leading-tight">Обучение</p>
                         <p className="text-xs text-gray-400">{ROLE_LABELS[user?.role]}</p>
                     </div>
+                </div>
+
+                {/* Поиск */}
+                <div className="px-3 pt-3">
+                    <button
+                        type="button"
+                        onClick={() => setPaletteOpen(true)}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-400 bg-gray-50 hover:bg-gray-100 transition-colors"
+                    >
+                        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                        </svg>
+                        <span className="flex-1 text-left">Поиск...</span>
+                        <kbd className="text-[10px] border border-gray-200 rounded px-1.5 py-0.5 bg-white">Ctrl K</kbd>
+                    </button>
                 </div>
 
                 {/* Навигация */}
@@ -210,6 +238,7 @@ export default function AppLayout({ children, title, fullHeight = false }) {
             </main>
 
             <FlashMessage />
+            <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} navItems={navItems} />
         </div>
     );
 }
