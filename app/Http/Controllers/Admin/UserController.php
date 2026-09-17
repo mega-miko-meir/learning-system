@@ -221,9 +221,15 @@ class UserController extends Controller
                 continue;
             }
 
+            $matrixId = TrainingMatrix::active()
+                ->where('position_id', $user->position_id)
+                ->where('document_id', $documentId)
+                ->value('id');
+
             $assignment = TrainingAssignment::create([
                 'user_id'                  => $user->id,
                 'document_id'              => $documentId,
+                'matrix_id'                => $matrixId,
                 'training_type'            => $data['training_type'],
                 'status'                   => 'pending',
                 'due_date'                 => $dueDate,
@@ -463,10 +469,23 @@ class UserController extends Controller
             return collect();
         }
 
+        $matrixByDocument = TrainingMatrix::active()
+            ->where('position_id', $user->position_id)
+            ->get()
+            ->keyBy('document_id');
+
         return Document::active()
-            ->whereIn('id', TrainingMatrix::active()->where('position_id', $user->position_id)->pluck('document_id'))
+            ->whereIn('id', $matrixByDocument->keys())
             ->orderBy('description')
-            ->get(['id', 'title', 'description']);
+            ->get(['id', 'title', 'description'])
+            ->map(fn($d) => [
+                'id'                     => $d->id,
+                'title'                  => $d->title,
+                'description'            => $d->description,
+                // Из матрицы обучения для этой должности — подсказка при выборе типа/времени вручную.
+                'matrix_training_type'   => $matrixByDocument[$d->id]->training_type,
+                'matrix_reading_minutes' => $matrixByDocument[$d->id]->required_reading_minutes,
+            ]);
     }
 
     private function assignTrainingByPosition(User $user): int

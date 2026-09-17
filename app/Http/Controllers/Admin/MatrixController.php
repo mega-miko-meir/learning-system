@@ -35,7 +35,13 @@ class MatrixController extends Controller
             ]);
 
         $departments = \App\Models\Department::active()->orderBy('name')->get(['id', 'name']);
-        $positions   = Position::active()->with('department')->orderBy('name')->get(['id', 'name', 'department_id']);
+        $positions   = Position::active()->with('department')->orderBy('name')->get()
+            ->map(fn($p) => [
+                'id'            => $p->id,
+                'name'          => $p->name,
+                'department_id' => $p->department_id,
+                'department'    => $p->department?->name,
+            ]);
         $documents   = Document::active()->orderBy('description')->get(['id', 'title', 'description']);
 
         return Inertia::render('Admin/Matrix/Index', compact('matrix', 'positions', 'documents', 'departments'));

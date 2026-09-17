@@ -315,7 +315,12 @@ function AddForm({ positions, documents, departments }) {
                         search={posSearch}
                         onSearch={setPosSearch}
                         searchPlaceholder="Поиск должности..."
-                        renderItem={(p) => <span className="font-medium text-gray-800">{p.name}</span>}
+                        renderItem={(p) => (
+                            <span className="font-medium text-gray-800">
+                                {p.name}
+                                {p.department && <span className="ml-1.5 font-normal text-gray-400">({p.department})</span>}
+                            </span>
+                        )}
                         emptyText="Нет должностей"
                         error={errors.position_ids}
                         onExpand={() => setExpanded("positions")}
@@ -329,7 +334,12 @@ function AddForm({ positions, documents, departments }) {
                             selectedIds={selectedPosIds}
                             onToggle={togglePos}
                             onToggleAll={toggleAllPos}
-                            renderItem={(p) => <span className="font-medium text-gray-800">{p.name}</span>}
+                            renderItem={(p) => (
+                            <span className="font-medium text-gray-800">
+                                {p.name}
+                                {p.department && <span className="ml-1.5 font-normal text-gray-400">({p.department})</span>}
+                            </span>
+                        )}
                             matchesSearch={(p, q) => p.name.toLowerCase().includes(q.toLowerCase())}
                             searchPlaceholder="Поиск должности..."
                             emptyText="Нет должностей"
