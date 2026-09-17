@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Document;
+use App\Models\Position;
 use App\Models\TrainingAssignment;
+use App\Models\TrainingMatrix;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -44,17 +46,30 @@ class DocumentController extends Controller
 
     public function create()
     {
-        return Inertia::render('Admin/Documents/Form', ['document' => null]);
+        $positions = Position::active()->with('department')->orderBy('name')->get()
+            ->map(fn($p) => [
+                'id'            => $p->id,
+                'name'          => $p->name,
+                'department_id' => $p->department_id,
+                'department'    => $p->department?->name,
+            ]);
+
+        return Inertia::render('Admin/Documents/Form', ['document' => null, 'positions' => $positions]);
     }
 
     public function store(Request $request)
     {
         $data = $request->validate([
-            'title'       => ['required', 'string', 'max:255'],
-            'type'        => ['required', 'string'],
-            'description' => ['required', 'string'],
-            'version'     => ['required', 'integer', 'min:1', 'max:255'],
-            'file'        => ['required', 'file', 'mimes:pdf,doc,docx', 'max:51200'],
+            'title'                   => ['required', 'string', 'max:255'],
+            'type'                    => ['required', 'string'],
+            'description'             => ['required', 'string'],
+            'version'                 => ['required', 'integer', 'min:1', 'max:255'],
+            'file'                    => ['required', 'file', 'mimes:pdf,doc,docx', 'max:51200'],
+            'position_ids'            => ['nullable', 'array'],
+            'position_ids.*'          => ['exists:positions,id'],
+            'matrix_training_type'    => ['nullable', 'in:primary,periodic,unplanned,special'],
+            'matrix_is_mandatory'     => ['boolean'],
+            'matrix_reading_minutes'  => ['nullable', 'integer', 'in:5,10,15,20,30,45,60'],
         ]);
 
         $path = $request->file('file')->store('documents', 'public');
@@ -81,8 +96,61 @@ class DocumentController extends Controller
             'created_at'  => now(),
         ]);
 
+        $matrixCount = $this->attachToMatrix($request, $document, $data);
+
+        $successMsg = 'Документ загружен.';
+        if ($matrixCount > 0) {
+            $successMsg .= " Добавлен в матрицу обучения для должностей: {$matrixCount}.";
+        }
+
         return redirect()->route('admin.documents.show', $document)
-            ->with('success', 'Документ загружен.');
+            ->with('success', $successMsg);
+    }
+
+    // Быстрая привязка нового документа к матрице обучения сразу при создании —
+    // избавляет от отдельного перехода в раздел «Матрица обучения».
+    private function attachToMatrix(Request $request, Document $document, array $data): int
+    {
+        if (empty($data['position_ids'])) {
+            return 0;
+        }
+
+        $created = 0;
+        foreach ($data['position_ids'] as $positionId) {
+            $exists = TrainingMatrix::where('position_id', $positionId)
+                ->where('document_id', $document->id)
+                ->where('is_active', true)
+                ->exists();
+
+            if ($exists) {
+                continue;
+            }
+
+            TrainingMatrix::create([
+                'position_id'              => $positionId,
+                'document_id'              => $document->id,
+                'training_type'            => $data['matrix_training_type'] ?? 'primary',
+                'is_mandatory'             => $request->boolean('matrix_is_mandatory', true),
+                'required_reading_minutes' => $data['matrix_reading_minutes'] ?? 10,
+                'is_active'                => true,
+            ]);
+            $created++;
+        }
+
+        if ($created > 0) {
+            AuditLog::create([
+                'user_id'     => auth()->id(),
+                'user_name'   => auth()->user()->full_name,
+                'action'      => 'create',
+                'model_type'  => 'TrainingMatrix',
+                'model_id'    => $document->id,
+                'ip_address'  => $request->ip(),
+                'description' => "Документ «{$document->display_name}» добавлен в матрицу обучения для {$created} должностей",
+                'created_at'  => now(),
+            ]);
+        }
+
+        return $created;
     }
 
     public function show(Document $document)
