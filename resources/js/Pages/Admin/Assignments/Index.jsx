@@ -1,7 +1,8 @@
 import { Head, Link, router, useForm } from "@inertiajs/react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import AppLayout from "../../../Layouts/AppLayout";
 import Pagination from "../../../Components/Pagination";
+import { CheckboxList, PickerModal } from "../../../Components/CheckboxPicker";
 
 const STATUS_MAP = {
     pending:     "Ожидает",
@@ -20,10 +21,257 @@ const TRAINING_TYPES = [
 
 const READING_MINUTES = [5, 10, 15, 20, 30, 45, 60];
 
-export default function AssignmentsIndex({ assignments, departments, positions, documents }) {
+function AssignForm({ employees, documents, departments, positions }) {
+    const [departmentId,   setDepartmentId]   = useState("");
+    const [positionId,     setPositionId]     = useState("");
+    const [selectedUserIds, setSelectedUserIds] = useState([]);
+    const [selectedDocIds,  setSelectedDocIds]  = useState([]);
+    const [trainingType,   setTrainingType]   = useState("primary");
+    const [readingMinutes, setReadingMinutes] = useState(10);
+    const [dueDate,        setDueDate]        = useState("");
+    const [userSearch,     setUserSearch]     = useState("");
+    const [docSearch,      setDocSearch]      = useState("");
+    const [saving,         setSaving]         = useState(false);
+    const [errors,         setErrors]         = useState({});
+    const [expanded,       setExpanded]       = useState(null); // 'employees' | 'documents' | null
+
+    function handleDepartmentChange(id) {
+        setDepartmentId(id);
+        setPositionId("");
+        setSelectedUserIds([]);
+    }
+
+    function handlePositionChange(id) {
+        setPositionId(id);
+        setSelectedUserIds([]);
+    }
+
+    const filteredPositions = departmentId
+        ? positions.filter((p) => String(p.department_id) === String(departmentId))
+        : positions;
+
+    const employeesInScope = useMemo(() => {
+        return employees
+            .filter((e) => !departmentId || String(e.department_id) === String(departmentId))
+            .filter((e) => !positionId || String(e.position_id) === String(positionId));
+    }, [employees, departmentId, positionId]);
+
+    const availableEmployees = useMemo(() => {
+        return employeesInScope.filter((e) =>
+            !userSearch.trim() || e.name.toLowerCase().includes(userSearch.toLowerCase())
+        );
+    }, [employeesInScope, userSearch]);
+
+    const availableDocs = useMemo(() => {
+        return documents.filter((d) =>
+            !docSearch.trim() ||
+            d.description.toLowerCase().includes(docSearch.toLowerCase()) ||
+            d.title.toLowerCase().includes(docSearch.toLowerCase())
+        );
+    }, [documents, docSearch]);
+
+    function toggleUser(id) {
+        setSelectedUserIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+    }
+
+    function toggleAllUsers(allSelected, items) {
+        setSelectedUserIds(allSelected ? [] : items.map((i) => i.id));
+    }
+
+    function toggleDoc(id) {
+        setSelectedDocIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+    }
+
+    function toggleAllDocs(allSelected, items) {
+        setSelectedDocIds(allSelected ? [] : items.map((i) => i.id));
+    }
+
+    function submit(e) {
+        e.preventDefault();
+        setErrors({});
+        const errs = {};
+        if (selectedUserIds.length === 0) errs.user_ids = "Выберите хотя бы одного сотрудника";
+        if (selectedDocIds.length === 0) errs.document_ids = "Выберите хотя бы один документ";
+        if (Object.keys(errs).length) { setErrors(errs); return; }
+
+        setSaving(true);
+        router.post(route("admin.assignments.bulk"), {
+            user_ids:         selectedUserIds,
+            document_ids:     selectedDocIds,
+            training_type:    trainingType,
+            due_date:         dueDate || null,
+            reading_minutes:  readingMinutes,
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setSelectedUserIds([]); setSelectedDocIds([]);
+                setUserSearch(""); setDocSearch(""); setDueDate("");
+            },
+            onError: setErrors,
+            onFinish: () => setSaving(false),
+        });
+    }
+
+    const total = selectedUserIds.length * selectedDocIds.length;
+
+    return (
+        <div className="bg-white rounded-xl border border-gray-100 p-5 sticky top-6">
+            <h2 className="text-sm font-semibold text-gray-700 mb-4">Назначить обучение</h2>
+
+            <form onSubmit={submit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                    <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Отдел (фильтр)</label>
+                        <select value={departmentId} onChange={(e) => handleDepartmentChange(e.target.value)}
+                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">— Все —</option>
+                            {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Должность (фильтр)</label>
+                        <select value={positionId} onChange={(e) => handlePositionChange(e.target.value)}
+                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">— Все —</option>
+                            {filteredPositions.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Сотрудники *{selectedUserIds.length > 0 && <span className="ml-1 text-blue-600">({selectedUserIds.length})</span>}
+                    </label>
+                    <CheckboxList
+                        items={availableEmployees}
+                        selectedIds={selectedUserIds}
+                        onToggle={toggleUser}
+                        onToggleAll={toggleAllUsers}
+                        search={userSearch}
+                        onSearch={setUserSearch}
+                        searchPlaceholder="Поиск сотрудника..."
+                        renderItem={(e) => (
+                            <>
+                                <span className="font-medium text-gray-800">{e.name}</span>
+                                <span className="block text-xs text-gray-400">
+                                    {[e.position, e.department].filter(Boolean).join(" · ") || "—"}
+                                </span>
+                            </>
+                        )}
+                        emptyText="Нет сотрудников"
+                        error={errors.user_ids}
+                        onExpand={() => setExpanded("employees")}
+                    />
+                    {expanded === "employees" && (
+                        <PickerModal
+                            title={departmentId || positionId ? "Сотрудники (с учётом фильтра)" : "Все сотрудники"}
+                            items={employeesInScope}
+                            selectedIds={selectedUserIds}
+                            onToggle={toggleUser}
+                            onToggleAll={toggleAllUsers}
+                            renderItem={(e) => (
+                                <>
+                                    <span className="font-medium text-gray-800">{e.name}</span>
+                                    <span className="block text-xs text-gray-400">
+                                        {[e.position, e.department].filter(Boolean).join(" · ") || "—"}
+                                    </span>
+                                </>
+                            )}
+                            matchesSearch={(e, q) => e.name.toLowerCase().includes(q.toLowerCase())}
+                            searchPlaceholder="Поиск сотрудника..."
+                            emptyText="Нет сотрудников"
+                            onClose={() => setExpanded(null)}
+                        />
+                    )}
+                </div>
+
+                <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Документы *{selectedDocIds.length > 0 && <span className="ml-1 text-blue-600">({selectedDocIds.length})</span>}
+                    </label>
+                    <CheckboxList
+                        items={availableDocs}
+                        selectedIds={selectedDocIds}
+                        onToggle={toggleDoc}
+                        onToggleAll={toggleAllDocs}
+                        search={docSearch}
+                        onSearch={setDocSearch}
+                        searchPlaceholder="Поиск документа..."
+                        renderItem={(d) => (
+                            <>
+                                <span className="font-medium text-gray-800">{d.title}</span>
+                                <span className="block text-xs text-gray-400">{d.description}</span>
+                            </>
+                        )}
+                        emptyText="Нет документов"
+                        error={errors.document_ids}
+                        onExpand={() => setExpanded("documents")}
+                    />
+                    {expanded === "documents" && (
+                        <PickerModal
+                            title="Все документы"
+                            items={documents}
+                            selectedIds={selectedDocIds}
+                            onToggle={toggleDoc}
+                            onToggleAll={toggleAllDocs}
+                            renderItem={(d) => (
+                                <>
+                                    <span className="font-medium text-gray-800">{d.title}</span>
+                                    <span className="block text-xs text-gray-400">{d.description}</span>
+                                </>
+                            )}
+                            matchesSearch={(d, q) => {
+                                const needle = q.toLowerCase();
+                                return d.title.toLowerCase().includes(needle) || d.description.toLowerCase().includes(needle);
+                            }}
+                            searchPlaceholder="Поиск документа..."
+                            emptyText="Нет документов"
+                            onClose={() => setExpanded(null)}
+                        />
+                    )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                    <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Вид обучения</label>
+                        <select value={trainingType} onChange={(e) => setTrainingType(e.target.value)}
+                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            {TRAINING_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Время изучения</label>
+                        <select value={readingMinutes} onChange={(e) => setReadingMinutes(parseInt(e.target.value))}
+                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            {READING_MINUTES.map((m) => <option key={m} value={m}>{m} мин</option>)}
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Срок до</label>
+                    <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    <p className="mt-1 text-xs text-gray-400">Если не указано — 30 дней от сегодня</p>
+                </div>
+
+                <button type="submit" disabled={saving || total === 0}
+                    className="w-full px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                    {saving
+                        ? "Назначаем..."
+                        : total > 0
+                            ? `Назначить ${total} запис${total === 1 ? "ь" : total < 5 ? "и" : "ей"}`
+                            : "Выберите сотрудников и документы"}
+                </button>
+            </form>
+        </div>
+    );
+}
+
+export default function AssignmentsIndex({ assignments, departments, positions, documents, employees }) {
     const params = Object.fromEntries(new URLSearchParams(window.location.search));
 
-    // ── Поиск по сотруднику (фронтенд) ───────────────────────────────
+    // ── Поиск по сотруднику в таблице (фронтенд) ──────────────────────
     const [search, setSearch] = useState("");
 
     const visibleRows = search.trim()
@@ -32,32 +280,9 @@ export default function AssignmentsIndex({ assignments, departments, positions, 
           )
         : assignments.data;
 
-    // ── Bulk assign form ──────────────────────────────────────────────
-    const [showBulk, setShowBulk]     = useState(false);
-    const [deptFilter, setDeptFilter] = useState("");
-
-    const bulkForm = useForm({
-        position_id:     "",
-        document_id:     "",
-        training_type:   "primary",
-        due_date:        "",
-        reading_minutes: 10,
-    });
-
-    const filteredPositions = deptFilter
-        ? positions.filter((p) => String(p.department_id) === String(deptFilter))
-        : positions;
-
     function filter(key, value) {
         router.get(route("admin.assignments.index"), { ...params, [key]: value || undefined }, {
             preserveState: true, replace: true,
-        });
-    }
-
-    function bulkAssign(e) {
-        e.preventDefault();
-        bulkForm.post(route("admin.assignments.bulk"), {
-            onSuccess: () => { bulkForm.reset(); setDeptFilter(""); setShowBulk(false); },
         });
     }
 
@@ -109,292 +334,170 @@ export default function AssignmentsIndex({ assignments, departments, positions, 
         <AppLayout title="Назначения обучения">
             <Head title="Назначения" />
 
-            {/* ── Фильтры и кнопка ── */}
-            <div className="flex flex-wrap gap-2 mb-6 items-center">
-                <div className="relative">
-                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 105 11a6 6 0 0012 0z" />
-                    </svg>
-                    <input
-                        type="text"
-                        placeholder="Поиск по сотруднику..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-52"
-                    />
-                    {search && (
-                        <button
-                            onClick={() => setSearch("")}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                        >×</button>
-                    )}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-1">
+                    <AssignForm employees={employees} documents={documents} departments={departments} positions={positions} />
                 </div>
 
-                <select
-                    value={params.status ?? ""}
-                    onChange={(e) => filter("status", e.target.value)}
-                    className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                    <option value="">Все статусы</option>
-                    {Object.entries(STATUS_MAP).map(([v, l]) => (
-                        <option key={v} value={v}>{l}</option>
-                    ))}
-                </select>
-
-                <select
-                    value={params.department_id ?? ""}
-                    onChange={(e) => filter("department_id", e.target.value)}
-                    className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                    <option value="">Все отделы</option>
-                    {departments.map((d) => (
-                        <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                </select>
-
-                {search && (
-                    <span className="text-xs text-gray-400">
-                        Найдено: {visibleRows.length}
-                    </span>
-                )}
-
-                <button
-                    onClick={() => setShowBulk(!showBulk)}
-                    className="ml-auto px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
-                >
-                    + Назначить обучение
-                </button>
-            </div>
-
-            {/* ── Форма массового назначения ── */}
-            {showBulk && (
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-6">
-                    <h3 className="text-sm font-semibold text-blue-800 mb-1">Назначить обучение по должности</h3>
-                    <p className="text-xs text-blue-600 mb-4">
-                        Документ будет назначен всем активным сотрудникам выбранной должности.
-                    </p>
-                    <form onSubmit={bulkAssign} className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1">
-                                    Отдел <span className="text-gray-400 font-normal ml-1">(для фильтра)</span>
-                                </label>
-                                <select
-                                    value={deptFilter}
-                                    onChange={(e) => { setDeptFilter(e.target.value); bulkForm.setData("position_id", ""); }}
-                                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                                >
-                                    <option value="">— Все отделы —</option>
-                                    {departments.map((d) => (
-                                        <option key={d.id} value={d.id}>{d.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1">
-                                    Должность <span className="text-red-500">*</span>
-                                </label>
-                                <select
-                                    value={bulkForm.data.position_id}
-                                    onChange={(e) => bulkForm.setData("position_id", e.target.value)}
-                                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white ${
-                                        bulkForm.errors.position_id ? "border-red-300" : "border-gray-200"
-                                    }`}
-                                >
-                                    <option value="">— Выберите должность —</option>
-                                    {filteredPositions.map((p) => (
-                                        <option key={p.id} value={p.id}>{p.name}</option>
-                                    ))}
-                                </select>
-                                {bulkForm.errors.position_id && (
-                                    <p className="mt-1 text-xs text-red-600">{bulkForm.errors.position_id}</p>
-                                )}
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1">
-                                    Документ <span className="text-red-500">*</span>
-                                </label>
-                                <select
-                                    value={bulkForm.data.document_id}
-                                    onChange={(e) => bulkForm.setData("document_id", e.target.value)}
-                                    className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white ${
-                                        bulkForm.errors.document_id ? "border-red-300" : "border-gray-200"
-                                    }`}
-                                >
-                                    <option value="">— Выберите документ —</option>
-                                    {documents.map((d) => (
-                                        <option key={d.id} value={d.id}>{d.description}</option>
-                                    ))}
-                                </select>
-                                {bulkForm.errors.document_id && (
-                                    <p className="mt-1 text-xs text-red-600">{bulkForm.errors.document_id}</p>
-                                )}
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1">Вид обучения</label>
-                                <select
-                                    value={bulkForm.data.training_type}
-                                    onChange={(e) => bulkForm.setData("training_type", e.target.value)}
-                                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                                >
-                                    {TRAINING_TYPES.map((t) => (
-                                        <option key={t.value} value={t.value}>{t.label}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-                        <div className="flex items-end gap-4 flex-wrap">
-                            <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1">
-                                    Время изучения <span className="text-red-500">*</span>
-                                </label>
-                                <select
-                                    value={bulkForm.data.reading_minutes}
-                                    onChange={(e) => bulkForm.setData("reading_minutes", parseInt(e.target.value))}
-                                    className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                                >
-                                    {READING_MINUTES.map((m) => (
-                                        <option key={m} value={m}>{m} мин</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1">Срок до</label>
-                                <input
-                                    type="date"
-                                    value={bulkForm.data.due_date}
-                                    onChange={(e) => bulkForm.setData("due_date", e.target.value)}
-                                    className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                                />
-                                <p className="text-xs text-gray-400 mt-1">Если не указано — 30 дней от сегодня</p>
-                            </div>
-                            <div className="flex gap-3 pb-0.5">
+                <div className="lg:col-span-2">
+                    {/* ── Фильтры таблицы ── */}
+                    <div className="flex flex-wrap gap-2 mb-4 items-center">
+                        <div className="relative">
+                            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 105 11a6 6 0 0012 0z" />
+                            </svg>
+                            <input
+                                type="text"
+                                placeholder="Поиск по сотруднику..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-52"
+                            />
+                            {search && (
                                 <button
-                                    type="submit"
-                                    disabled={bulkForm.processing || !bulkForm.data.position_id || !bulkForm.data.document_id}
-                                    className="px-5 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {bulkForm.processing ? "Назначаем..." : "Назначить"}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => { setShowBulk(false); setDeptFilter(""); bulkForm.reset(); }}
-                                    className="px-5 py-2 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50"
-                                >
-                                    Отмена
-                                </button>
-                            </div>
+                                    onClick={() => setSearch("")}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                >×</button>
+                            )}
                         </div>
-                    </form>
-                </div>
-            )}
 
-            {/* ── Таблица ── */}
-            <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-                <table className="w-full text-sm">
-                    <thead className="bg-gray-50 border-b border-gray-100">
-                        <tr>
-                            <th className="text-left px-4 py-3 font-medium text-gray-600">Сотрудник</th>
-                            <th className="text-left px-4 py-3 font-medium text-gray-600">Документ</th>
-                            <th className="text-left px-4 py-3 font-medium text-gray-600">Вид</th>
-                            <th className="text-left px-4 py-3 font-medium text-gray-600">Статус</th>
-                            <th className="text-left px-4 py-3 font-medium text-gray-600">Срок</th>
-                            <th className="text-left px-4 py-3 font-medium text-gray-600">Сдача теста</th>
-                            <th className="text-right px-4 py-3 font-medium text-gray-600">Действия</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                        {visibleRows.length === 0 ? (
-                            <tr>
-                                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
-                                    {search ? "Сотрудник не найден" : "Назначений нет"}
-                                </td>
-                            </tr>
+                        <select
+                            value={params.status ?? ""}
+                            onChange={(e) => filter("status", e.target.value)}
+                            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="">Все статусы</option>
+                            {Object.entries(STATUS_MAP).map(([v, l]) => (
+                                <option key={v} value={v}>{l}</option>
+                            ))}
+                        </select>
+
+                        <select
+                            value={params.department_id ?? ""}
+                            onChange={(e) => filter("department_id", e.target.value)}
+                            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="">Все отделы</option>
+                            {departments.map((d) => (
+                                <option key={d.id} value={d.id}>{d.name}</option>
+                            ))}
+                        </select>
+
+                        {search ? (
+                            <span className="text-xs text-gray-400">Найдено: {visibleRows.length}</span>
                         ) : (
-                            visibleRows.map((a) => (
-                                <tr key={a.id} className="hover:bg-gray-50">
-                                    <td className="px-4 py-3">
-                                        <Link
-                                            href={route("admin.users.show", a.user_id)}
-                                            className="text-gray-900 hover:text-blue-600 hover:underline"
-                                        >
-                                            {a.user}
-                                        </Link>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <Link
-                                            href={route("admin.documents.show", a.document_id)}
-                                            className="text-gray-600 hover:text-blue-600 hover:underline text-sm"
-                                        >
-                                            {a.document}
-                                        </Link>
-                                    </td>
-                                    <td className="px-4 py-3 text-gray-400 text-xs">
-                                        {TRAINING_TYPES.find((t) => t.value === a.type)?.label ?? a.type}
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                            a.status === "completed"   ? "bg-green-50 text-green-700"   :
-                                            a.status === "failed"      ? "bg-red-50 text-red-600"       :
-                                            a.status === "pending"     ? "bg-yellow-50 text-yellow-700" :
-                                            a.status === "in_progress" ? "bg-blue-50 text-blue-700"     :
-                                            "bg-gray-100 text-gray-500"
-                                        }`}>
-                                            {STATUS_MAP[a.status] ?? a.status}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3 text-gray-400 text-xs">
-                                        {a.due_date ?? "—"}
-                                    </td>
-                                    <td className="px-4 py-3 text-gray-400 text-xs">
-                                        {a.completed_at ?? "—"}
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <div className="flex items-center justify-end gap-1">
-                                            {/* Редактировать */}
-                                            <button
-                                                onClick={() => openEdit(a)}
-                                                title="Редактировать"
-                                                className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                                            >
-                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828A2 2 0 0110 16.414H8v-2a2 2 0 01.586-1.414z" />
-                                                </svg>
-                                            </button>
-
-                                            {/* Сбросить (только для failed) */}
-                                            {a.status === "failed" && (
-                                                <button
-                                                    onClick={() => setConfirmReset(a)}
-                                                    title="Дать повторную попытку"
-                                                    className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
-                                                >
-                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                                    </svg>
-                                                </button>
-                                            )}
-
-                                            {/* Удалить */}
-                                            <button
-                                                onClick={() => setConfirmDelete(a)}
-                                                title="Удалить"
-                                                className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                                            >
-                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0a2 2 0 00-2-2H9a2 2 0 00-2 2m10 0H5" />
-                                                </svg>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))
+                            <span className="text-xs text-gray-400">{assignments.total ?? assignments.data.length} записей</span>
                         )}
-                    </tbody>
-                </table>
-            </div>
+                    </div>
 
-            {!search && <Pagination links={assignments.links} />}
+                    {/* ── Таблица ── */}
+                    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+                        <table className="w-full text-sm">
+                            <thead className="bg-gray-50 border-b border-gray-100">
+                                <tr>
+                                    <th className="text-left px-4 py-3 font-medium text-gray-600">Сотрудник</th>
+                                    <th className="text-left px-4 py-3 font-medium text-gray-600">Документ</th>
+                                    <th className="text-left px-4 py-3 font-medium text-gray-600">Вид</th>
+                                    <th className="text-left px-4 py-3 font-medium text-gray-600">Статус</th>
+                                    <th className="text-left px-4 py-3 font-medium text-gray-600">Срок</th>
+                                    <th className="text-left px-4 py-3 font-medium text-gray-600">Сдача теста</th>
+                                    <th className="px-4 py-3 text-right font-medium text-gray-600">Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {visibleRows.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
+                                            {search ? "Сотрудник не найден" : "Назначений нет"}
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    visibleRows.map((a) => (
+                                        <tr key={a.id} className="hover:bg-gray-50">
+                                            <td className="px-4 py-3">
+                                                <Link
+                                                    href={route("admin.users.show", a.user_id)}
+                                                    className="text-gray-900 hover:text-blue-600 hover:underline"
+                                                >
+                                                    {a.user}
+                                                </Link>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <Link
+                                                    href={route("admin.documents.show", a.document_id)}
+                                                    className="text-gray-600 hover:text-blue-600 hover:underline text-sm"
+                                                >
+                                                    {a.document}
+                                                </Link>
+                                            </td>
+                                            <td className="px-4 py-3 text-gray-400 text-xs">
+                                                {TRAINING_TYPES.find((t) => t.value === a.type)?.label ?? a.type}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                                    a.status === "completed"   ? "bg-green-50 text-green-700"   :
+                                                    a.status === "failed"      ? "bg-red-50 text-red-600"       :
+                                                    a.status === "pending"     ? "bg-yellow-50 text-yellow-700" :
+                                                    a.status === "in_progress" ? "bg-blue-50 text-blue-700"     :
+                                                    "bg-gray-100 text-gray-500"
+                                                }`}>
+                                                    {STATUS_MAP[a.status] ?? a.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-gray-400 text-xs">
+                                                {a.due_date ?? "—"}
+                                            </td>
+                                            <td className="px-4 py-3 text-gray-400 text-xs">
+                                                {a.completed_at ?? "—"}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center justify-end gap-1">
+                                                    {/* Редактировать */}
+                                                    <button
+                                                        onClick={() => openEdit(a)}
+                                                        title="Редактировать"
+                                                        className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828A2 2 0 0110 16.414H8v-2a2 2 0 01.586-1.414z" />
+                                                        </svg>
+                                                    </button>
+
+                                                    {/* Сбросить (только для failed) */}
+                                                    {a.status === "failed" && (
+                                                        <button
+                                                            onClick={() => setConfirmReset(a)}
+                                                            title="Дать повторную попытку"
+                                                            className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                                                        >
+                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                            </svg>
+                                                        </button>
+                                                    )}
+
+                                                    {/* Удалить */}
+                                                    <button
+                                                        onClick={() => setConfirmDelete(a)}
+                                                        title="Удалить"
+                                                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0a2 2 0 00-2-2H9a2 2 0 00-2 2m10 0H5" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {!search && <Pagination links={assignments.links} />}
+                </div>
+            </div>
 
             {/* ── Модал редактирования ── */}
             {editing && (
