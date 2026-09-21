@@ -13,7 +13,7 @@ class NewEmployeeHired extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public function __construct(public User $employee) {}
+    public function __construct(public User $employee, public User $creator) {}
 
     public function envelope(): Envelope
     {

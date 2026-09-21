@@ -267,6 +267,8 @@ class UserController extends Controller
 
     private function notifyAdminsAboutNewEmployee(User $user): void
     {
+        $creator = auth()->user();
+
         $admins = User::active()
             ->where('role', 'admin')
             ->whereNotNull('email')
@@ -274,7 +276,7 @@ class UserController extends Controller
 
         foreach ($admins as $admin) {
             try {
-                Mail::to($admin->email)->queue(new NewEmployeeHired($user));
+                Mail::to($admin->email)->queue(new NewEmployeeHired($user, $creator));
             } catch (\Exception $e) {
                 Log::error('NewEmployeeHired mail failed: ' . $e->getMessage());
             }

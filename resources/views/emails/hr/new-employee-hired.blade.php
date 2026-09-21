@@ -14,16 +14,25 @@ td:first-child{color:#64748b;width:45%}
 </style></head>
 <body>
 <div class="card">
+    @php
+        $roleLabels = [
+            'admin'    => 'Администратор',
+            'hr_admin' => 'HR-администратор',
+            'manager'  => 'Руководитель',
+        ];
+        $creatorRole = $roleLabels[$creator->role] ?? $creator->role;
+    @endphp
     <div class="header">Принят новый сотрудник</div>
-    <div class="badge">Оформлено HR</div>
+    <div class="badge">Оформлено: {{ $creatorRole }}</div>
     <p style="color:#374151;font-size:15px">Здравствуйте!</p>
-    <p style="color:#374151;font-size:14px">HR оформил в системе нового сотрудника.</p>
+    <p style="color:#374151;font-size:14px">{{ $creator->full_name }} ({{ $creatorRole }}) оформил(а) в системе нового сотрудника.</p>
 
     <table>
         <tr><td>ФИО:</td><td><strong>{{ $employee->full_name }}</strong></td></tr>
         <tr><td>Должность:</td><td>{{ $employee->position?->name ?? 'Не указана' }}</td></tr>
         <tr><td>Дата приёма:</td><td><strong>{{ $employee->hired_at?->format('d.m.Y') ?? now()->format('d.m.Y') }}</strong></td></tr>
         <tr><td>Руководитель:</td><td>{{ $employee->manager?->full_name ?? 'Не указан' }}</td></tr>
+        <tr><td>Добавил(а):</td><td>{{ $creator->full_name }}</td></tr>
     </table>
 
     <a href="{{ route('admin.users.show', $employee->id) }}" class="btn">Открыть карточку сотрудника</a>
