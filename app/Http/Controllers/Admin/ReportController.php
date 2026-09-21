@@ -155,4 +155,62 @@ class ReportController extends Controller
 
         return Excel::download($export, $filename);
     }
+
+    // ─── PDF-отчёт по отделу (аналог Manager::teamPdf, но с выбором отдела и периода) ───
+    public function departmentPdf(Request $request)
+    {
+        $request->validate([
+            'department_id' => ['required', 'exists:departments,id'],
+            'date_from'     => ['nullable', 'date'],
+            'date_to'       => ['nullable', 'date'],
+        ]);
+
+        $department = Department::findOrFail($request->department_id);
+        $dateFrom   = $request->input('date_from');
+        $dateTo     = $request->input('date_to');
+
+        $staff = User::with('position')
+            ->where('department_id', $department->id)
+            ->active()
+            ->orderBy('last_name')
+            ->get();
+
+        $employees = $staff->map(function ($emp) use ($dateFrom, $dateTo) {
+            $assignments = TrainingAssignment::with(['document', 'testAttempts'])
+                ->where('user_id', $emp->id)
+                ->when($dateFrom, fn($q) => $q->whereDate('created_at', '>=', $dateFrom))
+                ->when($dateTo, fn($q) => $q->whereDate('created_at', '<=', $dateTo))
+                ->latest()
+                ->get();
+
+            $total     = $assignments->count();
+            $completed = $assignments->where('status', 'completed')->count();
+            $overdue   = $assignments->filter(fn($a) =>
+                in_array($a->status, ['pending', 'in_progress']) && $a->due_date && $a->due_date->isPast()
+            )->count();
+            $percent   = $total > 0 ? round($completed / $total * 100) : 0;
+
+            return [
+                'user'        => $emp,
+                'assignments' => $assignments,
+                'total'       => $total,
+                'completed'   => $completed,
+                'overdue'     => $overdue,
+                'percent'     => $percent,
+            ];
+        });
+
+        $deptTotal     = $employees->sum('total');
+        $deptCompleted = $employees->sum('completed');
+        $deptOverdue   = $employees->sum('overdue');
+        $deptPercent   = $deptTotal > 0 ? round($deptCompleted / $deptTotal * 100) : 0;
+
+        $pdf = Pdf::loadView('reports.department_pdf', compact(
+            'department', 'employees', 'deptTotal', 'deptCompleted', 'deptOverdue', 'deptPercent', 'dateFrom', 'dateTo'
+        ))->setPaper('a4', 'portrait');
+
+        $filename = 'department_report_' . str_replace(' ', '_', $department->name) . '_' . now()->format('Ymd') . '.pdf';
+
+        return $pdf->download($filename);
+    }
 }

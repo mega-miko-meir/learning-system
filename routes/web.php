@@ -121,6 +121,7 @@ Route::middleware(['auth', 'user.active'])->group(function () {
         Route::get('/reports/employee/{user}/pdf', [\App\Http\Controllers\Admin\ReportController::class, 'employeePdf'])->name('reports.employee.pdf');
         Route::get('/reports/department/{department}', [\App\Http\Controllers\Admin\ReportController::class, 'department'])->name('reports.department');
         Route::get('/reports/export', [\App\Http\Controllers\Admin\ReportController::class, 'export'])->name('reports.export');
+        Route::get('/reports/department-pdf', [\App\Http\Controllers\Admin\ReportController::class, 'departmentPdf'])->name('reports.department-pdf');
     });
 
     // ─── HR Администратор ────────────────────────────────────

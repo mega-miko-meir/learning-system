@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import AppLayout from "../../../Layouts/AppLayout";
 
 export default function ReportsIndex({ summary, byDepartment, employees }) {
+    const [departmentId, setDepartmentId] = useState("");
     const [dateFrom, setDateFrom] = useState("");
     const [dateTo, setDateTo]     = useState("");
     const [status, setStatus]     = useState("");
@@ -10,10 +11,19 @@ export default function ReportsIndex({ summary, byDepartment, employees }) {
 
     function buildExportUrl() {
         const p = new URLSearchParams();
+        if (departmentId) p.set("department_id", departmentId);
         if (dateFrom) p.set("date_from", dateFrom);
         if (dateTo)   p.set("date_to",   dateTo);
         if (status)   p.set("status",    status);
         return route("admin.reports.export") + (p.toString() ? "?" + p.toString() : "");
+    }
+
+    function buildDepartmentPdfUrl() {
+        const p = new URLSearchParams();
+        p.set("department_id", departmentId);
+        if (dateFrom) p.set("date_from", dateFrom);
+        if (dateTo)   p.set("date_to",   dateTo);
+        return route("admin.reports.department-pdf") + "?" + p.toString();
     }
 
     const filtered = useMemo(() => {
@@ -30,10 +40,23 @@ export default function ReportsIndex({ summary, byDepartment, employees }) {
         <AppLayout title="Отчёты">
             <Head title="Отчёты" />
 
-            {/* Excel-экспорт реестра */}
+            {/* Экспорт отчётов */}
             <div className="bg-white rounded-xl border border-gray-100 p-5 mb-6">
-                <h2 className="text-sm font-semibold text-gray-700 mb-4">Экспорт реестра обучения (Excel)</h2>
+                <h2 className="text-sm font-semibold text-gray-700 mb-1">Экспорт отчётов по обучению</h2>
+                <p className="text-xs text-gray-400 mb-4">
+                    Excel — полный реестр (отдел и статус необязательны). PDF — сводный отчёт по выбранному отделу.
+                </p>
                 <div className="flex flex-wrap gap-3 items-end">
+                    <div>
+                        <label className="block text-xs text-gray-500 mb-1">Отдел</label>
+                        <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}
+                            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">Все отделы</option>
+                            {byDepartment.map((d) => (
+                                <option key={d.id} value={d.id}>{d.name}</option>
+                            ))}
+                        </select>
+                    </div>
                     <div>
                         <label className="block text-xs text-gray-500 mb-1">Дата с</label>
                         <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
@@ -59,7 +82,28 @@ export default function ReportsIndex({ summary, byDepartment, employees }) {
                         className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 flex items-center gap-2">
                         ↓ Скачать Excel
                     </a>
+                    {departmentId ? (
+                        <a href={buildDepartmentPdfUrl()}
+                            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 flex items-center gap-2">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                            </svg>
+                            Выгрузить в PDF
+                        </a>
+                    ) : (
+                        <span
+                            title="Выберите отдел, чтобы сформировать PDF"
+                            className="px-4 py-2 bg-gray-100 text-gray-400 text-sm rounded-lg flex items-center gap-2 cursor-not-allowed">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                            </svg>
+                            Выгрузить в PDF
+                        </span>
+                    )}
                 </div>
+                {!departmentId && (
+                    <p className="text-xs text-gray-400 mt-2">Для PDF выберите отдел — отчёт формируется по одному отделу за раз.</p>
+                )}
             </div>
 
             {/* Сводка */}
