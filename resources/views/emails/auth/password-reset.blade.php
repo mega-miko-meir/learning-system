@@ -25,7 +25,7 @@ body{font-family:Arial,sans-serif;background:#f5f7fa;margin:0;padding:20px}
         <p>Новый временный пароль:&nbsp;<strong>{{ $tempPassword }}</strong></p>
     </div>
 
-    <p style="color:#64748b;font-size:13px">Если вы не запрашивали сброс пароля — обратитесь к администратору.</p>
+    <p style="color:#64748b;font-size:13px">Если вы не запрашивали сброс пароля – обратитесь к администратору.</p>
 
     <a href="{{ route('login') }}" class="btn">Войти в систему</a>
 

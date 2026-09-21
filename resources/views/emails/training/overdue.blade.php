@@ -22,7 +22,7 @@ td:first-child{color:#64748b;width:45%}
         <tr><td>Документ:</td><td>{{ $assignment->document->display_name }} (v{{ $assignment->document->version }})</td></tr>
         <tr><td>Срок был:</td><td><strong style="color:#dc2626">{{ $assignment->due_date?->format('d.m.Y') }}</strong></td></tr>
         <tr><td>Просрочено на:</td><td>{{ now()->diffInDays($assignment->due_date) }} дн.</td></tr>
-        <tr><td>Отдел:</td><td>{{ $assignment->user->department?->name ?? '—' }}</td></tr>
+        <tr><td>Отдел:</td><td>{{ $assignment->user->department?->name ?? '–' }}</td></tr>
     </table>
     <p style="color:#374151;font-size:14px">Пожалуйста, свяжитесь с сотрудником и обеспечьте прохождение обучения.</p>
     <div class="footer">Система обучения персонала · Автоматическое уведомление</div>

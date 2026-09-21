@@ -20,7 +20,7 @@ class PasswordResetNotification extends Mailable
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: 'Пароль сброшен — ' . config('app.name'));
+        return new Envelope(subject: 'Пароль сброшен – ' . config('app.name'));
     }
 
     public function content(): Content

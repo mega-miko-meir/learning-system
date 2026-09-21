@@ -21,7 +21,7 @@ class TrainingReminder extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Напоминание: через 7 дней — обучение по «' . $this->assignment->document->display_name . '»',
+            subject: 'Напоминание: через 7 дней – обучение по «' . $this->assignment->document->display_name . '»',
         );
     }
 

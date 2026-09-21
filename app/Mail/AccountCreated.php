@@ -20,7 +20,7 @@ class AccountCreated extends Mailable
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: 'Ваш аккаунт создан — ' . config('app.name'));
+        return new Envelope(subject: 'Ваш аккаунт создан – ' . config('app.name'));
     }
 
     public function content(): Content

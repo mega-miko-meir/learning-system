@@ -14,7 +14,7 @@ td:first-child{color:#64748b;width:45%}
 <body>
 <div class="card">
     <div class="header">👤 Принят новый сотрудник</div>
-    <div class="badge">Первичный инструктаж — сегодня</div>
+    <div class="badge">Первичный инструктаж – сегодня</div>
     <p style="color:#374151;font-size:15px">Здравствуйте!</p>
     <p style="color:#374151;font-size:14px">В компанию принят новый сотрудник. Необходимо провести первичный инструктаж в день оформления.</p>
     <table>
