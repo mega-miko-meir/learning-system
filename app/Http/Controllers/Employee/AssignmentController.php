@@ -37,7 +37,7 @@ class AssignmentController extends Controller
         $assignment->load('document.test');
 
         // Обучение без теста (первичный инструктаж) — отдельный экран, остальной код ниже не затронут.
-        if ($assignment->document->isConfirmationMode()) {
+        if (config('features.induction') && $assignment->document->isConfirmationMode()) {
             return app(InductionController::class)->show($assignment);
         }
 

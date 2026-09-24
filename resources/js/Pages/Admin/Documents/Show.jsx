@@ -1,10 +1,12 @@
-import { Head, Link, useForm, router } from "@inertiajs/react";
+import { Head, Link, useForm, usePage, router } from "@inertiajs/react";
 import { useRef } from "react";
 import AppLayout from "../../../Layouts/AppLayout";
 import InductionMaterials from "../../../Components/InductionMaterials";
 
 export default function DocumentShow({ document: doc, test, materials = [] }) {
-    const isConfirmation = doc.completion_mode === "confirmation";
+    // Первичный инструктаж без теста включается флагом FEATURE_INDUCTION (config/features.php)
+    const inductionEnabled = !!usePage().props.features?.induction;
+    const isConfirmation = inductionEnabled && doc.completion_mode === "confirmation";
     const fileRef = useRef(null);
     const { data, setData, post, processing, errors } = useForm({ file: null });
 
@@ -57,12 +59,14 @@ export default function DocumentShow({ document: doc, test, materials = [] }) {
                                 <dt className="text-gray-400 text-xs">Версия</dt>
                                 <dd className="text-gray-700 font-mono">v{doc.version}</dd>
                             </div>
-                            <div>
-                                <dt className="text-gray-400 text-xs">Способ завершения</dt>
-                                <dd className="text-gray-700">
-                                    {isConfirmation ? "Отметка без теста (видео + ознакомление)" : "Чтение и тест"}
-                                </dd>
-                            </div>
+                            {inductionEnabled && (
+                                <div>
+                                    <dt className="text-gray-400 text-xs">Способ завершения</dt>
+                                    <dd className="text-gray-700">
+                                        {isConfirmation ? "Отметка без теста (видео + ознакомление)" : "Чтение и тест"}
+                                    </dd>
+                                </div>
+                            )}
                             <div>
                                 <dt className="text-gray-400 text-xs">Статус</dt>
                                 <dd>

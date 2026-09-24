@@ -30,6 +30,9 @@ class HandleInertiaRequests extends Middleware
                     'must_change_password' => $request->user()->must_change_password,
                 ] : null,
             ],
+            'features' => [
+                'induction' => (bool) config('features.induction'),
+            ],
             'flash' => [
                 'success'      => fn () => $request->session()->get('success'),
                 'error'        => fn () => $request->session()->get('error'),

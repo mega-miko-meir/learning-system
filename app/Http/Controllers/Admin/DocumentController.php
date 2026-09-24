@@ -84,7 +84,7 @@ class DocumentController extends Controller
             'version'     => $data['version'],
             'is_active'   => true,
             'uploaded_by' => auth()->id(),
-            'completion_mode' => $data['completion_mode'] ?? 'test',
+            'completion_mode' => config('features.induction') ? ($data['completion_mode'] ?? 'test') : 'test',
         ]);
 
         AuditLog::create([
@@ -165,7 +165,7 @@ class DocumentController extends Controller
                 'id'    => $document->test->id,
                 'title' => $document->test->title,
             ] : null,
-            'materials' => $document->isConfirmationMode()
+            'materials' => (config('features.induction') && $document->isConfirmationMode())
                 ? $document->materials->map(fn($m) => [
                     'id'               => $m->id,
                     'kind'             => $m->kind,
@@ -194,6 +194,11 @@ class DocumentController extends Controller
             'is_active'   => ['boolean'],
             'completion_mode' => ['nullable', 'in:test,confirmation'],
         ]);
+
+        // Функция выключена — режим документа не меняем (сохраняем как есть).
+        if (!config('features.induction')) {
+            unset($data['completion_mode']);
+        }
 
         if (($data['completion_mode'] ?? null) === 'confirmation' && $document->test()->exists()) {
             return back()->withErrors([

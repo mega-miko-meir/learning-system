@@ -1,4 +1,4 @@
-import { Head, useForm, Link } from "@inertiajs/react";
+import { Head, useForm, usePage, Link } from "@inertiajs/react";
 import { useMemo, useState } from "react";
 import AppLayout from "../../../Layouts/AppLayout";
 import { CheckboxList, PickerModal } from "../../../Components/CheckboxPicker";
@@ -73,6 +73,8 @@ const DOC_TYPE_GROUPS = [
 
 export default function DocumentForm({ document, positions = [] }) {
     const isEdit = !!document;
+    // Первичный инструктаж без теста включается флагом FEATURE_INDUCTION (config/features.php)
+    const inductionEnabled = !!usePage().props.features?.induction;
 
     // _method: 'put' включён в данные формы (не в опции), чтобы Laravel
     // воспринял POST как PUT при загрузке файлов (multipart не поддерживает PUT).
@@ -261,6 +263,7 @@ export default function DocumentForm({ document, positions = [] }) {
                         )}
                     </div>
 
+                    {inductionEnabled && (
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1.5">
                             Способ завершения обучения
@@ -285,6 +288,7 @@ export default function DocumentForm({ document, positions = [] }) {
                             </p>
                         )}
                     </div>
+                    )}
 
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1.5">

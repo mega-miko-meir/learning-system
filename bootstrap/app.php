@@ -18,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role'        => \App\Http\Middleware\EnsureRole::class,
             'user.active' => \App\Http\Middleware\EnsureUserIsActive::class,
+            'feature'     => \App\Http\Middleware\EnsureFeatureEnabled::class,
         ]);
 
         $middleware->redirectUsersTo(function (\Illuminate\Http\Request $request): string {
