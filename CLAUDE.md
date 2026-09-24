@@ -201,6 +201,14 @@ resources/js/
 - `notifyBlocked()` вызывается **после** обновления статуса назначения (иначе при ошибке SMTP статус не обновлялся бы).
 - Обёрнут в `try-catch` с `Log::error` — SMTP-ошибки не ломают сдачу теста.
 
+### Обучение без теста (первичный инструктаж с видео)
+- Режим задаётся **документом**, а не `training_type`: `documents.completion_mode` = `test` (по умолчанию, вся прежняя логика) или `confirmation`. Нельзя привязывать «без теста» к `training_type = primary` — этот тип используется и для обычных СОП в матрице.
+- Материалы: таблица `document_materials` (`kind` = `video` | `text`; видео лежат на **приватном** диске `local`, `storage/app/private/induction-videos`, отдаются через контроллеры с проверкой доступа и Range). Управляются в карточке документа (`Components/InductionMaterials.jsx`, `Admin\DocumentMaterialController`).
+- Прогресс: `assignment_material_progress` (`max_position_seconds` только растёт). Вся логика — в `App\Services\InductionProgress`: порог 90% (`WATCH_THRESHOLD`), позиция не может опережать реальное время воспроизведения (защита от перемотки/накрутки), статус `completed` ставится автоматически, когда просмотрены все обязательные видео **и** сотрудник подтвердил ознакомление (`training_assignments.acknowledged_at`). Подтверждение возможно только после просмотра видео.
+- Точки входа в существующий код минимальны: ранняя ветка в `Employee\AssignmentController::show()` (для `confirmation` рендерится `Employee/Assignments/Induction`), режим в `DocumentController`. `Employee\TestController` и страница `Employee/Assignments/Show` не менялись.
+- Длительность видео определяется в браузере админа при загрузке и сохраняется в `duration_seconds` (нужна для порога 90%).
+- Лимиты загрузки видео: в валидации до 500 МБ; на сервере нужно поднять `upload_max_filesize`, `post_max_size` (PHP) и `client_max_body_size` (nginx).
+
 ### Аудит-лог
 - `admin` НЕ видит записи и пользователей с ролью `superadmin`.
 - `superadmin` видит всё.

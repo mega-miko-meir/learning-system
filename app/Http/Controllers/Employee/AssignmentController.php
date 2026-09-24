@@ -36,6 +36,11 @@ class AssignmentController extends Controller
 
         $assignment->load('document.test');
 
+        // Обучение без теста (первичный инструктаж) — отдельный экран, остальной код ниже не затронут.
+        if ($assignment->document->isConfirmationMode()) {
+            return app(InductionController::class)->show($assignment);
+        }
+
         $requiredSeconds = ($assignment->required_reading_minutes ?? 10) * 60;
         $spentSeconds    = $assignment->time_spent_seconds ?? 0;
         $isUnlocked      = $spentSeconds >= $requiredSeconds;

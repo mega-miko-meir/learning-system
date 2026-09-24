@@ -12,16 +12,22 @@ class TrainingAssignment extends Model
     protected $fillable = [
         'user_id', 'document_id', 'matrix_id', 'training_type',
         'status', 'due_date', 'started_at', 'completed_at',
-        'time_spent_seconds', 'required_reading_minutes',
+        'time_spent_seconds', 'required_reading_minutes', 'acknowledged_at',
     ];
 
     protected function casts(): array
     {
         return [
-            'due_date'     => 'datetime',
-            'started_at'   => 'datetime',
-            'completed_at' => 'datetime',
+            'due_date'        => 'datetime',
+            'started_at'      => 'datetime',
+            'completed_at'    => 'datetime',
+            'acknowledged_at' => 'datetime',
         ];
+    }
+
+    public function materialProgress()
+    {
+        return $this->hasMany(AssignmentMaterialProgress::class, 'assignment_id');
     }
 
     public function user()

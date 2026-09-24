@@ -11,7 +11,7 @@ class Document extends Model
 
     protected $fillable = [
         'title', 'type', 'description', 'file_path',
-        'version', 'is_active', 'uploaded_by',
+        'version', 'is_active', 'uploaded_by', 'completion_mode',
     ];
 
     protected $appends = ['display_name'];
@@ -31,6 +31,17 @@ class Document extends Model
     public function test()
     {
         return $this->hasOne(Test::class);
+    }
+
+    public function materials()
+    {
+        return $this->hasMany(DocumentMaterial::class)->orderBy('sort_order')->orderBy('id');
+    }
+
+    // Обучение без теста: просмотр видео + подтверждение ознакомления (например, первичный инструктаж).
+    public function isConfirmationMode(): bool
+    {
+        return $this->completion_mode === 'confirmation';
     }
 
     public function trainingMatrix()

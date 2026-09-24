@@ -43,6 +43,11 @@ Route::middleware(['auth', 'user.active'])->group(function () {
         Route::get('/assignments/{assignment}/test', [\App\Http\Controllers\Employee\TestController::class, 'show'])->name('test.show');
         Route::post('/assignments/{assignment}/test/start', [\App\Http\Controllers\Employee\TestController::class, 'start'])->name('test.start');
         Route::post('/assignments/{assignment}/test/submit', [\App\Http\Controllers\Employee\TestController::class, 'submit'])->name('test.submit');
+
+        // Обучение без теста (первичный инструктаж): видео + подтверждение ознакомления
+        Route::get('/assignments/{assignment}/induction/materials/{material}/video', [\App\Http\Controllers\Employee\InductionController::class, 'video'])->name('induction.video');
+        Route::post('/assignments/{assignment}/induction/materials/{material}/progress', [\App\Http\Controllers\Employee\InductionController::class, 'progress'])->name('induction.progress');
+        Route::post('/assignments/{assignment}/induction/acknowledge', [\App\Http\Controllers\Employee\InductionController::class, 'acknowledge'])->name('induction.acknowledge');
     });
 
     // ─── Руководитель ─────────────────────────────────────────
@@ -84,6 +89,12 @@ Route::middleware(['auth', 'user.active'])->group(function () {
         Route::resource('documents', \App\Http\Controllers\Admin\DocumentController::class);
         Route::post('/documents/{document}/new-version', [\App\Http\Controllers\Admin\DocumentController::class, 'uploadNewVersion'])->name('documents.new-version');
         Route::delete('/documents/{document}/force', [\App\Http\Controllers\Admin\DocumentController::class, 'forceDestroy'])->name('documents.force-delete');
+
+        // Материалы обучения без теста (видео, текстовые пункты)
+        Route::post('/documents/{document}/materials', [\App\Http\Controllers\Admin\DocumentMaterialController::class, 'store'])->name('documents.materials.store');
+        Route::patch('/materials/{material}', [\App\Http\Controllers\Admin\DocumentMaterialController::class, 'update'])->name('materials.update');
+        Route::delete('/materials/{material}', [\App\Http\Controllers\Admin\DocumentMaterialController::class, 'destroy'])->name('materials.destroy');
+        Route::get('/materials/{material}/preview', [\App\Http\Controllers\Admin\DocumentMaterialController::class, 'preview'])->name('materials.preview');
 
         // Матрица обучения
         Route::get('/matrix', [\App\Http\Controllers\Admin\MatrixController::class, 'index'])->name('matrix.index');

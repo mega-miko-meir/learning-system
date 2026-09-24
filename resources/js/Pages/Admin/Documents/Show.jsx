@@ -1,8 +1,10 @@
 import { Head, Link, useForm, router } from "@inertiajs/react";
 import { useRef } from "react";
 import AppLayout from "../../../Layouts/AppLayout";
+import InductionMaterials from "../../../Components/InductionMaterials";
 
-export default function DocumentShow({ document: doc, test }) {
+export default function DocumentShow({ document: doc, test, materials = [] }) {
+    const isConfirmation = doc.completion_mode === "confirmation";
     const fileRef = useRef(null);
     const { data, setData, post, processing, errors } = useForm({ file: null });
 
@@ -56,6 +58,12 @@ export default function DocumentShow({ document: doc, test }) {
                                 <dd className="text-gray-700 font-mono">v{doc.version}</dd>
                             </div>
                             <div>
+                                <dt className="text-gray-400 text-xs">Способ завершения</dt>
+                                <dd className="text-gray-700">
+                                    {isConfirmation ? "Отметка без теста (видео + ознакомление)" : "Чтение и тест"}
+                                </dd>
+                            </div>
+                            <div>
                                 <dt className="text-gray-400 text-xs">Статус</dt>
                                 <dd>
                                     <span className={`text-xs px-2 py-0.5 rounded-full ${
@@ -93,7 +101,11 @@ export default function DocumentShow({ document: doc, test }) {
                         </div>
                     </div>
 
+                    {/* Обучение без теста: видео и устный инструктаж вместо теста */}
+                    {isConfirmation && <InductionMaterials document={doc} materials={materials} />}
+
                     {/* Тест к документу */}
+                    {!isConfirmation && (
                     <div className="bg-white rounded-xl border border-gray-100 p-5">
                         <h2 className="text-sm font-semibold text-gray-700 mb-3">Тест</h2>
                         {test ? (
@@ -120,6 +132,7 @@ export default function DocumentShow({ document: doc, test }) {
                             </div>
                         )}
                     </div>
+                    )}
 
                     {/* Загрузка новой версии */}
                     <div className="bg-white rounded-xl border border-gray-100 p-5">

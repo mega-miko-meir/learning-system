@@ -65,6 +65,7 @@ class DocumentController extends Controller
             'description'             => ['required', 'string'],
             'version'                 => ['required', 'integer', 'min:1', 'max:255'],
             'file'                    => ['required', 'file', 'mimes:pdf,doc,docx', 'max:51200'],
+            'completion_mode'         => ['nullable', 'in:test,confirmation'],
             'position_ids'            => ['nullable', 'array'],
             'position_ids.*'          => ['exists:positions,id'],
             'matrix_training_type'    => ['nullable', 'in:primary,periodic,unplanned,special'],
@@ -83,6 +84,7 @@ class DocumentController extends Controller
             'version'     => $data['version'],
             'is_active'   => true,
             'uploaded_by' => auth()->id(),
+            'completion_mode' => $data['completion_mode'] ?? 'test',
         ]);
 
         AuditLog::create([
@@ -163,6 +165,17 @@ class DocumentController extends Controller
                 'id'    => $document->test->id,
                 'title' => $document->test->title,
             ] : null,
+            'materials' => $document->isConfirmationMode()
+                ? $document->materials->map(fn($m) => [
+                    'id'               => $m->id,
+                    'kind'             => $m->kind,
+                    'title'            => $m->title,
+                    'body'             => $m->body,
+                    'is_required'      => $m->is_required,
+                    'duration_seconds' => $m->duration_seconds,
+                    'preview_url'      => $m->isVideo() ? route('admin.materials.preview', $m) : null,
+                ])->values()
+                : [],
         ]);
     }
 
@@ -179,7 +192,14 @@ class DocumentController extends Controller
             'description' => ['required', 'string'],
             'version'     => ['required', 'integer', 'min:1', 'max:255'],
             'is_active'   => ['boolean'],
+            'completion_mode' => ['nullable', 'in:test,confirmation'],
         ]);
+
+        if (($data['completion_mode'] ?? null) === 'confirmation' && $document->test()->exists()) {
+            return back()->withErrors([
+                'completion_mode' => 'У документа уже есть тест. Для режима «Отметка без теста» сначала удалите тест.',
+            ]);
+        }
 
         $document->update($data);
 
@@ -221,6 +241,7 @@ class DocumentController extends Controller
         $title    = $document->display_name;
         $id       = $document->id;
         $filePath = $document->file_path;
+        $videoPaths = $document->materials()->whereNotNull('file_path')->pluck('file_path');
 
         // Каскадное удаление через onDelete('cascade') в БД:
         // test → questions → answers, training_assignments → test_attempts → attempt_answers, training_matrix
@@ -228,6 +249,9 @@ class DocumentController extends Controller
 
         if ($filePath) {
             Storage::disk('public')->delete($filePath);
+        }
+        foreach ($videoPaths as $videoPath) {
+            Storage::disk('local')->delete($videoPath);
         }
 
         AuditLog::create([
