@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\Department;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -13,18 +14,18 @@ class DepartmentController extends Controller
 {
     public function index()
     {
-        $departments = Department::withCount(['users' => fn($q) => $q->active()])
+        $departments = Department::withCount(['users' => fn ($q) => $q->active()])
             ->with('manager')
             ->orderBy('name')
             ->paginate(20)
-            ->through(fn($d) => [
-                'id'          => $d->id,
-                'name'        => $d->name,
-                'code'        => $d->code,
-                'short_name'  => $d->short_name,
-                'is_active'   => $d->is_active,
+            ->through(fn ($d) => [
+                'id' => $d->id,
+                'name' => $d->name,
+                'code' => $d->code,
+                'short_name' => $d->short_name,
+                'is_active' => $d->is_active,
                 'users_count' => $d->users_count,
-                'manager'     => $d->manager?->full_name,
+                'manager' => $d->manager?->full_name,
             ]);
 
         return Inertia::render('Admin/Departments/Index', compact('departments'));
@@ -34,20 +35,22 @@ class DepartmentController extends Controller
     {
         return Inertia::render('Admin/Departments/Form', [
             'department' => null,
-            'managers'   => $this->managers(),
+            'managers' => $this->managers(),
         ]);
     }
 
     public function store(Request $request)
     {
         $data = $request->validate([
-            'name'       => ['required', 'string', 'max:150', 'unique:departments,name'],
-            'code'       => ['nullable', 'string', 'max:10'],
+            'name' => ['required', 'string', 'max:150', 'unique:departments,name'],
+            'code' => ['nullable', 'string', 'max:10'],
             'short_name' => ['nullable', 'string', 'max:50'],
             'manager_id' => ['nullable', 'exists:users,id'],
         ]);
 
-        Department::create([...$data, 'is_active' => true]);
+        $department = Department::create([...$data, 'is_active' => true]);
+
+        AuditLog::log('create', 'Department', $department->id, "Создан отдел: {$department->name}");
 
         return redirect()->route('admin.departments.index')->with('success', 'Отдел создан.');
     }
@@ -63,12 +66,12 @@ class DepartmentController extends Controller
     {
         return Inertia::render('Admin/Departments/Form', [
             'department' => [
-                'id'         => $department->id,
-                'name'       => $department->name,
-                'code'       => $department->code,
+                'id' => $department->id,
+                'name' => $department->name,
+                'code' => $department->code,
                 'short_name' => $department->short_name,
                 'manager_id' => $department->manager_id,
-                'is_active'  => $department->is_active,
+                'is_active' => $department->is_active,
             ],
             'managers' => $this->managers(),
         ]);
@@ -77,14 +80,17 @@ class DepartmentController extends Controller
     public function update(Request $request, Department $department)
     {
         $data = $request->validate([
-            'name'       => ['required', 'string', 'max:150', Rule::unique('departments', 'name')->ignore($department->id)],
-            'code'       => ['nullable', 'string', 'max:10'],
+            'name' => ['required', 'string', 'max:150', Rule::unique('departments', 'name')->ignore($department->id)],
+            'code' => ['nullable', 'string', 'max:10'],
             'short_name' => ['nullable', 'string', 'max:50'],
             'manager_id' => ['nullable', 'exists:users,id'],
-            'is_active'  => ['boolean'],
+            'is_active' => ['boolean'],
         ]);
 
+        $oldValues = $department->only(array_keys($data));
         $department->update($data);
+
+        AuditLog::log('update', 'Department', $department->id, "Изменён отдел: {$department->name}", $oldValues, $data);
 
         return redirect()->route('admin.departments.index')->with('success', 'Отдел обновлён.');
     }
@@ -98,6 +104,8 @@ class DepartmentController extends Controller
     public function destroy(Department $department)
     {
         $department->update(['is_active' => false]);
+
+        AuditLog::log('deactivate', 'Department', $department->id, "Деактивирован отдел: {$department->name}");
 
         return back()->with('success', 'Отдел деактивирован.');
     }

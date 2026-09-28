@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
+use App\Models\Department;
 use App\Models\Document;
 use App\Models\Position;
 use App\Models\TrainingAssignment;
@@ -20,29 +22,29 @@ class MatrixController extends Controller
             ->with(['position.department', 'document'])
             ->orderBy('position_id')
             ->get()
-            ->map(fn($m) => [
-                'id'                       => $m->id,
-                'position_id'              => $m->position_id,
-                'document_id'              => $m->document_id,
-                'position'                 => $m->position->name,
-                'department'               => $m->position->department?->name,
-                'department_id'            => $m->position->department?->id,
-                'document_code'            => $m->document->title,
-                'document'                 => $m->document->display_name,
-                'training_type'            => $m->training_type,
-                'is_mandatory'             => $m->is_mandatory,
+            ->map(fn ($m) => [
+                'id' => $m->id,
+                'position_id' => $m->position_id,
+                'document_id' => $m->document_id,
+                'position' => $m->position->name,
+                'department' => $m->position->department?->name,
+                'department_id' => $m->position->department?->id,
+                'document_code' => $m->document->title,
+                'document' => $m->document->display_name,
+                'training_type' => $m->training_type,
+                'is_mandatory' => $m->is_mandatory,
                 'required_reading_minutes' => $m->required_reading_minutes,
             ]);
 
-        $departments = \App\Models\Department::active()->orderBy('name')->get(['id', 'name']);
-        $positions   = Position::active()->with('department')->orderBy('name')->get()
-            ->map(fn($p) => [
-                'id'            => $p->id,
-                'name'          => $p->name,
+        $departments = Department::active()->orderBy('name')->get(['id', 'name']);
+        $positions = Position::active()->with('department')->orderBy('name')->get()
+            ->map(fn ($p) => [
+                'id' => $p->id,
+                'name' => $p->name,
                 'department_id' => $p->department_id,
-                'department'    => $p->department?->name,
+                'department' => $p->department?->name,
             ]);
-        $documents   = Document::active()->orderBy('description')->get(['id', 'title', 'description']);
+        $documents = Document::active()->orderBy('description')->get(['id', 'title', 'description']);
 
         return Inertia::render('Admin/Matrix/Index', compact('matrix', 'positions', 'documents', 'departments'));
     }
@@ -50,12 +52,12 @@ class MatrixController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'position_ids'             => ['required', 'array', 'min:1'],
-            'position_ids.*'           => ['exists:positions,id'],
-            'document_ids'             => ['required', 'array', 'min:1'],
-            'document_ids.*'           => ['exists:documents,id'],
-            'training_type'            => ['required', Rule::in(['primary', 'periodic', 'unplanned', 'special'])],
-            'is_mandatory'             => ['boolean'],
+            'position_ids' => ['required', 'array', 'min:1'],
+            'position_ids.*' => ['exists:positions,id'],
+            'document_ids' => ['required', 'array', 'min:1'],
+            'document_ids.*' => ['exists:documents,id'],
+            'training_type' => ['required', Rule::in(['primary', 'periodic', 'unplanned', 'special'])],
+            'is_mandatory' => ['boolean'],
             'required_reading_minutes' => ['required', 'integer', 'min:1', 'max:9999'],
         ]);
 
@@ -70,19 +72,29 @@ class MatrixController extends Controller
 
                 if ($exists) {
                     $skipped++;
+
                     continue;
                 }
 
                 TrainingMatrix::create([
-                    'position_id'              => $positionId,
-                    'document_id'              => $documentId,
-                    'training_type'            => $data['training_type'],
-                    'is_mandatory'             => $data['is_mandatory'] ?? false,
+                    'position_id' => $positionId,
+                    'document_id' => $documentId,
+                    'training_type' => $data['training_type'],
+                    'is_mandatory' => $data['is_mandatory'] ?? false,
                     'required_reading_minutes' => $data['required_reading_minutes'],
-                    'is_active'                => true,
+                    'is_active' => true,
                 ]);
                 $created++;
             }
+        }
+
+        if ($created > 0) {
+            AuditLog::log(
+                'create',
+                'TrainingMatrix',
+                null,
+                "Добавлено в матрицу обучения: {$created} записей (должностей: ".count($data['position_ids']).', документов: '.count($data['document_ids']).')'
+            );
         }
 
         $message = "Добавлено в матрицу: {$created} записей.";
@@ -96,16 +108,29 @@ class MatrixController extends Controller
     public function update(Request $request, TrainingMatrix $matrix)
     {
         $data = $request->validate([
-            'training_type'            => ['sometimes', 'required', Rule::in(['primary', 'periodic', 'unplanned', 'special'])],
-            'is_mandatory'             => ['boolean'],
+            'training_type' => ['sometimes', 'required', Rule::in(['primary', 'periodic', 'unplanned', 'special'])],
+            'is_mandatory' => ['boolean'],
             'required_reading_minutes' => ['sometimes', 'required', 'integer', 'min:1', 'max:9999'],
         ]);
+
+        $matrix->load('position', 'document');
+        $label = "{$matrix->position->name} — {$matrix->document->display_name}";
+        $oldValues = $matrix->only(array_keys($data));
 
         $matrix->update($data);
 
         $updated = TrainingAssignment::where('matrix_id', $matrix->id)
             ->whereIn('status', ['pending', 'in_progress'])
             ->update(['required_reading_minutes' => $data['required_reading_minutes']]);
+
+        AuditLog::log(
+            'update',
+            'TrainingMatrix',
+            $matrix->id,
+            "Изменена запись матрицы обучения: {$label}".($updated > 0 ? " (обновлено активных назначений: {$updated})" : ''),
+            $oldValues,
+            $data
+        );
 
         $message = 'Запись матрицы обновлена.';
         if ($updated > 0) {
@@ -117,7 +142,12 @@ class MatrixController extends Controller
 
     public function destroy(TrainingMatrix $matrix)
     {
+        $matrix->load('position', 'document');
+        $label = "{$matrix->position->name} — {$matrix->document->display_name}";
+
         $matrix->update(['is_active' => false]);
+
+        AuditLog::log('deactivate', 'TrainingMatrix', $matrix->id, "Удалена запись из матрицы обучения: {$label}");
 
         return back()->with('success', 'Запись удалена из матрицы.');
     }
@@ -140,19 +170,23 @@ class MatrixController extends Controller
                     ->whereNotIn('status', ['expired'])
                     ->exists();
 
-                if (!$exists) {
+                if (! $exists) {
                     TrainingAssignment::create([
-                        'user_id'                  => $user->id,
-                        'document_id'              => $item->document_id,
-                        'matrix_id'                => $item->id,
-                        'training_type'            => $item->training_type,
-                        'status'                   => 'pending',
-                        'due_date'                 => now()->addDays(30),
+                        'user_id' => $user->id,
+                        'document_id' => $item->document_id,
+                        'matrix_id' => $item->id,
+                        'training_type' => $item->training_type,
+                        'status' => 'pending',
+                        'due_date' => now()->addDays(30),
                         'required_reading_minutes' => $item->required_reading_minutes,
                     ]);
                     $created++;
                 }
             }
+        }
+
+        if ($created > 0) {
+            AuditLog::log('create', 'TrainingAssignment', null, "Матрица применена ко всем сотрудникам: создано назначений {$created}");
         }
 
         return back()->with('success', "Матрица применена. Создано назначений: {$created}.");

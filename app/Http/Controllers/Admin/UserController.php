@@ -12,7 +12,6 @@ use App\Mail\PasswordResetNotification;
 use App\Models\AuditLog;
 use App\Models\Department;
 use App\Models\Document;
-use App\Models\Position;
 use App\Models\TrainingAssignment;
 use App\Models\TrainingMatrix;
 use App\Models\User;
@@ -30,33 +29,31 @@ class UserController extends Controller
     {
         $users = User::with(['department', 'position', 'manager'])
             ->where('role', '!=', 'superadmin')
-            ->when($request->search, fn($q, $s) =>
-                $q->where(fn($q) =>
-                    $q->where('last_name', 'like', "%$s%")
-                      ->orWhere('first_name', 'like', "%$s%")
-                      ->orWhere('phone', 'like', "%$s%")
-                      ->orWhere('email', 'like', "%$s%")
-                )
+            ->when($request->search, fn ($q, $s) => $q->where(fn ($q) => $q->where('last_name', 'like', "%$s%")
+                ->orWhere('first_name', 'like', "%$s%")
+                ->orWhere('phone', 'like', "%$s%")
+                ->orWhere('email', 'like', "%$s%")
             )
-            ->when($request->department_id, fn($q, $d) => $q->where('department_id', $d))
-            ->when($request->role, fn($q, $r) => $q->where('role', $r))
-            ->when($request->status === 'inactive', fn($q) => $q->where('is_active', false))
-            ->when($request->status !== 'inactive' && $request->status !== 'all', fn($q) => $q->active())
+            )
+            ->when($request->department_id, fn ($q, $d) => $q->where('department_id', $d))
+            ->when($request->role, fn ($q, $r) => $q->where('role', $r))
+            ->when($request->status === 'inactive', fn ($q) => $q->where('is_active', false))
+            ->when($request->status !== 'inactive' && $request->status !== 'all', fn ($q) => $q->active())
             ->orderBy('last_name')
             ->paginate(20)
             ->withQueryString()
-            ->through(fn($u) => [
-                'id'         => $u->id,
-                'full_name'  => $u->full_name,
+            ->through(fn ($u) => [
+                'id' => $u->id,
+                'full_name' => $u->full_name,
                 'short_name' => $u->short_name,
-                'role'       => $u->role,
-                'phone'      => $u->phone,
-                'email'      => $u->email,
+                'role' => $u->role,
+                'phone' => $u->phone,
+                'email' => $u->email,
                 'department' => $u->department?->name,
-                'position'   => $u->position?->name,
-                'is_active'  => $u->is_active,
-                'hired_at'   => $u->hired_at?->format('d.m.Y'),
-                'fired_at'   => $u->fired_at?->format('d.m.Y'),
+                'position' => $u->position?->name,
+                'is_active' => $u->is_active,
+                'hired_at' => $u->hired_at?->format('d.m.Y'),
+                'fired_at' => $u->fired_at?->format('d.m.Y'),
             ]);
 
         $departments = Department::active()->orderBy('name')->get(['id', 'name']);
@@ -70,11 +67,11 @@ class UserController extends Controller
 
         $export = new UsersExport(
             departmentId: $request->integer('department_id') ?: null,
-            role:         $request->input('role') ?: null,
-            status:       $status,
+            role: $request->input('role') ?: null,
+            status: $status,
         );
 
-        $filename = 'employees_' . now()->format('Ymd_His') . '.xlsx';
+        $filename = 'employees_'.now()->format('Ymd_His').'.xlsx';
 
         return Excel::download($export, $filename);
     }
@@ -83,8 +80,8 @@ class UserController extends Controller
     {
         return Inertia::render('Admin/Users/Form', [
             'departments' => Department::active()->with('positions')->orderBy('name')->get(),
-            'managers'    => User::active()->whereIn('role', ['manager', 'admin'])->orderBy('last_name')->get(['id', 'last_name', 'first_name', 'middle_name']),
-            'user'        => null,
+            'managers' => User::active()->whereIn('role', ['manager', 'admin'])->orderBy('last_name')->get(['id', 'last_name', 'first_name', 'middle_name']),
+            'user' => null,
         ]);
     }
 
@@ -93,29 +90,29 @@ class UserController extends Controller
         $isEmployee = $request->role === 'employee';
 
         $data = $request->validate([
-            'last_name'     => ['required', 'string', 'max:100'],
-            'first_name'    => ['required', 'string', 'max:100'],
-            'middle_name'   => ['nullable', 'string', 'max:100'],
-            'role'          => ['required', Rule::in(['admin', 'hr_admin', 'manager', 'employee'])],
-            'phone'         => array_filter(['nullable', 'string', 'max:20', 'unique:users,phone', $isEmployee ? 'required_without:email' : null]),
-            'email'         => array_filter(['nullable', 'email', 'unique:users,email', $isEmployee ? 'required_without:phone' : 'required']),
+            'last_name' => ['required', 'string', 'max:100'],
+            'first_name' => ['required', 'string', 'max:100'],
+            'middle_name' => ['nullable', 'string', 'max:100'],
+            'role' => ['required', Rule::in(['admin', 'hr_admin', 'manager', 'employee'])],
+            'phone' => array_filter(['nullable', 'string', 'max:20', 'unique:users,phone', $isEmployee ? 'required_without:email' : null]),
+            'email' => array_filter(['nullable', 'email', 'unique:users,email', $isEmployee ? 'required_without:phone' : 'required']),
             'department_id' => ['nullable', 'exists:departments,id'],
-            'position_id'   => ['nullable', 'exists:positions,id'],
-            'manager_id'    => ['nullable', 'exists:users,id'],
-            'hired_at'      => ['nullable', 'date'],
+            'position_id' => ['nullable', 'exists:positions,id'],
+            'manager_id' => ['nullable', 'exists:users,id'],
+            'hired_at' => ['nullable', 'date'],
         ], [
             'phone.required_without' => 'Укажите телефон или email.',
             'email.required_without' => 'Укажите email или телефон.',
         ]);
 
-        $tempPassword = 'Temp' . rand(1000, 9999) . '!';
-        $mustChange   = $request->boolean('must_change_password', true);
+        $tempPassword = 'Temp'.rand(1000, 9999).'!';
+        $mustChange = $request->boolean('must_change_password', true);
 
         $user = User::create([
             ...$data,
-            'password'             => Hash::make($tempPassword),
+            'password' => Hash::make($tempPassword),
             'must_change_password' => $mustChange,
-            'is_active'            => true,
+            'is_active' => true,
         ]);
 
         if ($user->position_id) {
@@ -123,14 +120,14 @@ class UserController extends Controller
         }
 
         AuditLog::create([
-            'user_id'    => auth()->id(),
-            'user_name'  => auth()->user()->full_name,
-            'action'     => 'create',
+            'user_id' => auth()->id(),
+            'user_name' => auth()->user()->full_name,
+            'action' => 'create',
             'model_type' => 'User',
-            'model_id'   => $user->id,
+            'model_id' => $user->id,
             'new_values' => $data,
             'ip_address' => $request->ip(),
-            'description'=> "Создан сотрудник: {$user->full_name}",
+            'description' => "Создан сотрудник: {$user->full_name}",
             'created_at' => now(),
         ]);
 
@@ -141,8 +138,8 @@ class UserController extends Controller
         $successMsg = 'Сотрудник успешно создан.';
 
         if ($request->boolean('send_email') && $user->email) {
-            $userId   = $user->id;
-            $tempPwd  = $tempPassword;
+            $userId = $user->id;
+            $tempPwd = $tempPassword;
             dispatch(function () use ($userId, $tempPwd) {
                 try {
                     $u = User::with(['department', 'position'])->find($userId);
@@ -150,10 +147,10 @@ class UserController extends Controller
                         Mail::to($u->email)->send(new AccountCreated($u, $tempPwd));
                     }
                 } catch (\Exception $e) {
-                    Log::error('AccountCreated mail failed: ' . $e->getMessage());
+                    Log::error('AccountCreated mail failed: '.$e->getMessage());
                 }
             })->afterResponse();
-            $successMsg .= ' Письмо с данными для входа отправлено на ' . $user->email . '.';
+            $successMsg .= ' Письмо с данными для входа отправлено на '.$user->email.'.';
         }
 
         return redirect()->route('admin.users.show', $user)
@@ -166,32 +163,32 @@ class UserController extends Controller
         $user->load(['department', 'position', 'manager']);
 
         $assignments = TrainingAssignment::with([
-                'document',
-                'testAttempts.attemptAnswers.question',
-                'testAttempts.attemptAnswers.answer',
-            ])
+            'document',
+            'testAttempts.attemptAnswers.question',
+            'testAttempts.attemptAnswers.answer',
+        ])
             ->where('user_id', $user->id)
             ->latest()
             ->get()
-            ->map(fn($a) => [
-                'id'           => $a->id,
-                'document'     => $a->document->display_name,
-                'type'         => $a->training_type,
-                'status'       => $a->status,
-                'due_date'     => $a->due_date?->format('d.m.Y'),
+            ->map(fn ($a) => [
+                'id' => $a->id,
+                'document' => $a->document->display_name,
+                'type' => $a->training_type,
+                'status' => $a->status,
+                'due_date' => $a->due_date?->format('d.m.Y'),
                 'completed_at' => $a->completed_at?->format('d.m.Y'),
-                'best_score'   => $a->testAttempts->max('score_percentage'),
-                'attempts'     => $a->testAttempts->map(fn($att) => [
-                    'id'             => $att->id,
+                'best_score' => $a->testAttempts->max('score_percentage'),
+                'attempts' => $a->testAttempts->map(fn ($att) => [
+                    'id' => $att->id,
                     'attempt_number' => $att->attempt_number,
-                    'score'          => $att->score_percentage,
-                    'passed'         => $att->is_passed,
-                    'finished_at'    => $att->finished_at?->format('d.m.Y H:i'),
-                    'answers'        => $att->attemptAnswers
+                    'score' => $att->score_percentage,
+                    'passed' => $att->is_passed,
+                    'finished_at' => $att->finished_at?->format('d.m.Y H:i'),
+                    'answers' => $att->attemptAnswers
                         ->groupBy('question_id')
-                        ->map(fn($group) => [
-                            'question'   => $group->first()->question?->question_text,
-                            'chosen'     => $group->map(fn($aa) => $aa->answer?->answer_text)->filter()->implode(', '),
+                        ->map(fn ($group) => [
+                            'question' => $group->first()->question?->question_text,
+                            'chosen' => $group->map(fn ($aa) => $aa->answer?->answer_text)->filter()->implode(', '),
                             'is_correct' => (bool) $group->first()->is_correct,
                         ])
                         ->values(),
@@ -199,30 +196,30 @@ class UserController extends Controller
             ]);
 
         return Inertia::render('Admin/Users/Show', [
-            'employee'    => [
-                'id'         => $user->id,
-                'full_name'  => $user->full_name,
-                'role'       => $user->role,
-                'phone'      => $user->phone,
-                'email'      => $user->email,
+            'employee' => [
+                'id' => $user->id,
+                'full_name' => $user->full_name,
+                'role' => $user->role,
+                'phone' => $user->phone,
+                'email' => $user->email,
                 'department' => $user->department?->name,
-                'position'   => $user->position?->name,
-                'manager'    => $user->manager?->short_name,
-                'is_active'  => $user->is_active,
-                'hired_at'   => $user->hired_at?->format('d.m.Y'),
-                'fired_at'   => $user->fired_at?->format('d.m.Y'),
+                'position' => $user->position?->name,
+                'manager' => $user->manager?->short_name,
+                'is_active' => $user->is_active,
+                'hired_at' => $user->hired_at?->format('d.m.Y'),
+                'fired_at' => $user->fired_at?->format('d.m.Y'),
             ],
             'assignments' => $assignments,
-            'documents'   => $this->positionDocuments($user),
+            'documents' => $this->positionDocuments($user),
         ]);
     }
 
     public function storeAssignment(Request $request, User $user)
     {
         $data = $request->validate([
-            'document_ids'    => ['required', 'array', 'min:1'],
-            'document_ids.*'  => ['exists:documents,id'],
-            'training_type'   => ['required', 'in:primary,periodic,unplanned,special'],
+            'document_ids' => ['required', 'array', 'min:1'],
+            'document_ids.*' => ['exists:documents,id'],
+            'training_type' => ['required', 'in:primary,periodic,unplanned,special'],
             'reading_minutes' => ['required', 'integer', 'in:5,10,15,20,30,45,60'],
         ]);
 
@@ -240,6 +237,7 @@ class UserController extends Controller
 
             if ($exists) {
                 $skipped++;
+
                 continue;
             }
 
@@ -249,12 +247,12 @@ class UserController extends Controller
                 ->value('id');
 
             $assignment = TrainingAssignment::create([
-                'user_id'                  => $user->id,
-                'document_id'              => $documentId,
-                'matrix_id'                => $matrixId,
-                'training_type'            => $data['training_type'],
-                'status'                   => 'pending',
-                'due_date'                 => $dueDate,
+                'user_id' => $user->id,
+                'document_id' => $documentId,
+                'matrix_id' => $matrixId,
+                'training_type' => $data['training_type'],
+                'status' => 'pending',
+                'due_date' => $dueDate,
                 'required_reading_minutes' => $data['reading_minutes'],
             ]);
 
@@ -264,7 +262,7 @@ class UserController extends Controller
                 try {
                     Mail::to($user->email)->queue(new NewTrainingAssigned($assignment));
                 } catch (\Exception $e) {
-                    Log::error('Failed to send assignment email: ' . $e->getMessage());
+                    Log::error('Failed to send assignment email: '.$e->getMessage());
                 }
             }
 
@@ -280,20 +278,20 @@ class UserController extends Controller
         }
 
         AuditLog::create([
-            'user_id'    => auth()->id(),
-            'user_name'  => auth()->user()->full_name,
-            'action'     => 'create',
+            'user_id' => auth()->id(),
+            'user_name' => auth()->user()->full_name,
+            'action' => 'create',
             'model_type' => 'TrainingAssignment',
-            'model_id'   => $created[0]->id,
+            'model_id' => $created[0]->id,
             'new_values' => $data,
             'ip_address' => $request->ip(),
-            'description'=> count($created) === 1
+            'description' => count($created) === 1
                 ? "Назначено обучение «{$created[0]->document->display_name}» сотруднику {$user->full_name}"
-                : 'Назначено обучение (' . count($created) . " документов) сотруднику {$user->full_name}",
+                : 'Назначено обучение ('.count($created)." документов) сотруднику {$user->full_name}",
             'created_at' => now(),
         ]);
 
-        $message = 'Назначено документов: ' . count($created) . '.';
+        $message = 'Назначено документов: '.count($created).'.';
         if ($skipped > 0) {
             $message .= " Пропущено (уже назначено): {$skipped}.";
         }
@@ -315,7 +313,7 @@ class UserController extends Controller
             try {
                 Mail::to($admin->email)->queue(new NewEmployeeHired($user, $creator));
             } catch (\Exception $e) {
-                Log::error('NewEmployeeHired mail failed: ' . $e->getMessage());
+                Log::error('NewEmployeeHired mail failed: '.$e->getMessage());
             }
         }
     }
@@ -323,7 +321,7 @@ class UserController extends Controller
     private function notifyOokAboutNewEmployee(User $user, TrainingAssignment $assignment): void
     {
         $ook = Department::where('short_name', 'ООК')->first();
-        if (!$ook) {
+        if (! $ook) {
             return;
         }
 
@@ -332,19 +330,19 @@ class UserController extends Controller
             ->whereIn('role', ['manager', 'admin'])
             ->get();
 
-        if ($ook->manager && !$recipients->contains('id', $ook->manager->id)) {
+        if ($ook->manager && ! $recipients->contains('id', $ook->manager->id)) {
             $recipients->push($ook->manager);
         }
 
         foreach ($recipients as $recipient) {
-            if (!$recipient->email) {
+            if (! $recipient->email) {
                 continue;
             }
 
             try {
                 Mail::to($recipient->email)->queue(new NewEmployeeInduction($user, $assignment));
             } catch (\Exception $e) {
-                Log::error('Failed to notify OOK manager about new employee: ' . $e->getMessage());
+                Log::error('Failed to notify OOK manager about new employee: '.$e->getMessage());
             }
         }
     }
@@ -353,8 +351,8 @@ class UserController extends Controller
     {
         return Inertia::render('Admin/Users/Form', [
             'departments' => Department::active()->with('positions')->orderBy('name')->get(),
-            'managers'    => User::active()->whereIn('role', ['manager', 'admin'])->orderBy('last_name')->get(['id', 'last_name', 'first_name', 'middle_name']),
-            'user'        => $user,
+            'managers' => User::active()->whereIn('role', ['manager', 'admin'])->orderBy('last_name')->get(['id', 'last_name', 'first_name', 'middle_name']),
+            'user' => $user,
         ]);
     }
 
@@ -363,22 +361,22 @@ class UserController extends Controller
         $isEmployee = $user->role === 'employee';
 
         $data = $request->validate([
-            'last_name'     => ['required', 'string', 'max:100'],
-            'first_name'    => ['required', 'string', 'max:100'],
-            'middle_name'   => ['nullable', 'string', 'max:100'],
-            'phone'         => array_filter(['nullable', 'string', 'max:20', Rule::unique('users', 'phone')->ignore($user->id), $isEmployee ? 'required_without:email' : null]),
-            'email'         => array_filter(['nullable', 'email', Rule::unique('users', 'email')->ignore($user->id), $isEmployee ? 'required_without:phone' : 'required']),
+            'last_name' => ['required', 'string', 'max:100'],
+            'first_name' => ['required', 'string', 'max:100'],
+            'middle_name' => ['nullable', 'string', 'max:100'],
+            'phone' => array_filter(['nullable', 'string', 'max:20', Rule::unique('users', 'phone')->ignore($user->id), $isEmployee ? 'required_without:email' : null]),
+            'email' => array_filter(['nullable', 'email', Rule::unique('users', 'email')->ignore($user->id), $isEmployee ? 'required_without:phone' : 'required']),
             'department_id' => ['nullable', 'exists:departments,id'],
-            'position_id'   => ['nullable', 'exists:positions,id'],
-            'manager_id'    => ['nullable', 'exists:users,id'],
-            'hired_at'      => ['nullable', 'date'],
+            'position_id' => ['nullable', 'exists:positions,id'],
+            'manager_id' => ['nullable', 'exists:users,id'],
+            'hired_at' => ['nullable', 'date'],
         ], [
             'phone.required_without' => 'Укажите телефон или email.',
             'email.required_without' => 'Укажите email или телефон.',
         ]);
 
         $oldPositionId = $user->position_id;
-        $oldValues     = $user->only(array_keys($data));
+        $oldValues = $user->only(array_keys($data));
 
         $user->update($data);
 
@@ -387,15 +385,15 @@ class UserController extends Controller
         }
 
         AuditLog::create([
-            'user_id'    => auth()->id(),
-            'user_name'  => auth()->user()->full_name,
-            'action'     => 'update',
+            'user_id' => auth()->id(),
+            'user_name' => auth()->user()->full_name,
+            'action' => 'update',
             'model_type' => 'User',
-            'model_id'   => $user->id,
+            'model_id' => $user->id,
             'old_values' => $oldValues,
             'new_values' => $data,
             'ip_address' => $request->ip(),
-            'description'=> "Обновлён сотрудник: {$user->full_name}",
+            'description' => "Обновлён сотрудник: {$user->full_name}",
             'created_at' => now(),
         ]);
 
@@ -408,17 +406,17 @@ class UserController extends Controller
 
         $user->update([
             'is_active' => false,
-            'fired_at'  => $request->fired_at ?? now()->toDateString(),
+            'fired_at' => $request->fired_at ?? now()->toDateString(),
         ]);
 
         AuditLog::create([
-            'user_id'    => auth()->id(),
-            'user_name'  => auth()->user()->full_name,
-            'action'     => 'deactivate',
+            'user_id' => auth()->id(),
+            'user_name' => auth()->user()->full_name,
+            'action' => 'deactivate',
             'model_type' => 'User',
-            'model_id'   => $user->id,
+            'model_id' => $user->id,
             'ip_address' => $request->ip(),
-            'description'=> "Деактивирован сотрудник: {$user->full_name}",
+            'description' => "Деактивирован сотрудник: {$user->full_name}",
             'created_at' => now(),
         ]);
 
@@ -430,13 +428,13 @@ class UserController extends Controller
         $user->update(['is_active' => true, 'fired_at' => null]);
 
         AuditLog::create([
-            'user_id'    => auth()->id(),
-            'user_name'  => auth()->user()->full_name,
-            'action'     => 'activate',
+            'user_id' => auth()->id(),
+            'user_name' => auth()->user()->full_name,
+            'action' => 'activate',
             'model_type' => 'User',
-            'model_id'   => $user->id,
+            'model_id' => $user->id,
             'ip_address' => $request->ip(),
-            'description'=> "Активирован сотрудник: {$user->full_name}",
+            'description' => "Активирован сотрудник: {$user->full_name}",
             'created_at' => now(),
         ]);
 
@@ -448,7 +446,7 @@ class UserController extends Controller
     // Ограничено ролями employee/hr_admin/manager — админов и супер-админов отсюда не удалить.
     public function destroy(Request $request, User $user)
     {
-        abort_if(!in_array($user->role, ['employee', 'hr_admin', 'manager']), 403);
+        abort_if(! in_array($user->role, ['employee', 'hr_admin', 'manager']), 403);
 
         if ($user->is_active) {
             return back()->with('error', 'Сначала деактивируйте сотрудника — удалить можно только деактивированного.');
@@ -471,22 +469,22 @@ class UserController extends Controller
             $blockers[] = "руководит отделом «{$managedDept->name}»";
         }
 
-        if (!empty($blockers)) {
-            return back()->with('error', 'Нельзя удалить сотрудника: ' . implode(', ', $blockers) . '.');
+        if (! empty($blockers)) {
+            return back()->with('error', 'Нельзя удалить сотрудника: '.implode(', ', $blockers).'.');
         }
 
         $name = $user->full_name;
 
         // Пишем в аудит до удаления — иначе user_id в этой же записи обнулился бы (nullOnDelete).
         AuditLog::create([
-            'user_id'     => auth()->id(),
-            'user_name'   => auth()->user()->full_name,
-            'action'      => 'delete_permanent',
-            'model_type'  => 'User',
-            'model_id'    => $user->id,
-            'ip_address'  => $request->ip(),
+            'user_id' => auth()->id(),
+            'user_name' => auth()->user()->full_name,
+            'action' => 'delete_permanent',
+            'model_type' => 'User',
+            'model_id' => $user->id,
+            'ip_address' => $request->ip(),
             'description' => "Окончательно удалён сотрудник: {$name}",
-            'created_at'  => now(),
+            'created_at' => now(),
         ]);
 
         $user->delete();
@@ -496,29 +494,29 @@ class UserController extends Controller
 
     public function resetPassword(Request $request, User $user)
     {
-        $tempPassword = 'Temp' . rand(1000, 9999) . '!';
-        $mustChange   = $request->boolean('must_change_password', true);
+        $tempPassword = 'Temp'.rand(1000, 9999).'!';
+        $mustChange = $request->boolean('must_change_password', true);
 
         $user->update([
-            'password'             => Hash::make($tempPassword),
+            'password' => Hash::make($tempPassword),
             'must_change_password' => $mustChange,
         ]);
 
         AuditLog::create([
-            'user_id'    => auth()->id(),
-            'user_name'  => auth()->user()->full_name,
-            'action'     => 'reset_password',
+            'user_id' => auth()->id(),
+            'user_name' => auth()->user()->full_name,
+            'action' => 'reset_password',
             'model_type' => 'User',
-            'model_id'   => $user->id,
+            'model_id' => $user->id,
             'ip_address' => $request->ip(),
-            'description'=> "Сброшен пароль для: {$user->full_name}",
+            'description' => "Сброшен пароль для: {$user->full_name}",
             'created_at' => now(),
         ]);
 
         $successMsg = 'Пароль сброшен.';
 
         if ($request->boolean('send_email') && $user->email) {
-            $userId  = $user->id;
+            $userId = $user->id;
             $tempPwd = $tempPassword;
             dispatch(function () use ($userId, $tempPwd) {
                 try {
@@ -527,10 +525,10 @@ class UserController extends Controller
                         Mail::to($u->email)->send(new PasswordResetNotification($u, $tempPwd));
                     }
                 } catch (\Exception $e) {
-                    Log::error('PasswordReset mail failed: ' . $e->getMessage());
+                    Log::error('PasswordReset mail failed: '.$e->getMessage());
                 }
             })->afterResponse();
-            $successMsg .= ' Письмо с новым паролем отправлено на ' . $user->email . '.';
+            $successMsg .= ' Письмо с новым паролем отправлено на '.$user->email.'.';
         }
 
         return back()
@@ -540,11 +538,15 @@ class UserController extends Controller
 
     public function assignTraining(User $user)
     {
-        if (!$user->position_id) {
+        if (! $user->position_id) {
             return back()->with('info', 'У сотрудника не указана должность — назначение невозможно.');
         }
 
         $created = $this->assignTrainingByPosition($user);
+
+        if ($created > 0) {
+            AuditLog::log('create', 'TrainingAssignment', null, "Автоназначение обучения по должности для {$user->full_name}: создано {$created}");
+        }
 
         $message = $created > 0
             ? "Назначено новых обучений: {$created}."
@@ -557,7 +559,7 @@ class UserController extends Controller
 
     private function positionDocuments(User $user)
     {
-        if (!$user->position_id) {
+        if (! $user->position_id) {
             return collect();
         }
 
@@ -570,12 +572,12 @@ class UserController extends Controller
             ->whereIn('id', $matrixByDocument->keys())
             ->orderBy('description')
             ->get(['id', 'title', 'description'])
-            ->map(fn($d) => [
-                'id'                     => $d->id,
-                'title'                  => $d->title,
-                'description'            => $d->description,
+            ->map(fn ($d) => [
+                'id' => $d->id,
+                'title' => $d->title,
+                'description' => $d->description,
                 // Из матрицы обучения для этой должности — подсказка при выборе типа/времени вручную.
-                'matrix_training_type'   => $matrixByDocument[$d->id]->training_type,
+                'matrix_training_type' => $matrixByDocument[$d->id]->training_type,
                 'matrix_reading_minutes' => $matrixByDocument[$d->id]->required_reading_minutes,
             ]);
     }
@@ -594,14 +596,14 @@ class UserController extends Controller
                 ->whereNotIn('status', ['expired'])
                 ->exists();
 
-            if (!$exists) {
+            if (! $exists) {
                 TrainingAssignment::create([
-                    'user_id'                  => $user->id,
-                    'document_id'              => $item->document_id,
-                    'matrix_id'                => $item->id,
-                    'training_type'            => $item->training_type,
-                    'status'                   => 'pending',
-                    'due_date'                 => now()->addDays(30),
+                    'user_id' => $user->id,
+                    'document_id' => $item->document_id,
+                    'matrix_id' => $item->id,
+                    'training_type' => $item->training_type,
+                    'status' => 'pending',
+                    'due_date' => now()->addDays(30),
                     'required_reading_minutes' => $item->required_reading_minutes,
                 ]);
                 $created++;

@@ -14,21 +14,21 @@ class DocumentMaterialController extends Controller
 {
     public function store(Request $request, Document $document)
     {
-        if (!$document->isConfirmationMode()) {
+        if (! $document->isConfirmationMode()) {
             return back()->with('error', 'Материалы можно добавлять только к документам с режимом «Отметка без теста».');
         }
 
         $data = $request->validate([
-            'kind'             => ['required', 'in:video,text'],
-            'title'            => ['required', 'string', 'max:255'],
-            'body'             => ['nullable', 'string', 'max:5000'],
-            'is_required'      => ['boolean'],
+            'kind' => ['required', 'in:video,text'],
+            'title' => ['required', 'string', 'max:255'],
+            'body' => ['nullable', 'string', 'max:5000'],
+            'is_required' => ['boolean'],
             'duration_seconds' => ['nullable', 'integer', 'min:1', 'max:14400'],
-            'file'             => ['required_if:kind,video', 'nullable', 'file', 'mimetypes:video/mp4,video/webm,video/quicktime', 'max:512000'],
+            'file' => ['required_if:kind,video', 'nullable', 'file', 'mimetypes:video/mp4,video/webm,video/quicktime', 'max:512000'],
         ], [
             'file.required_if' => 'Для видео нужно выбрать файл.',
-            'file.mimetypes'   => 'Допустимые форматы видео: MP4, WebM, MOV.',
-            'file.max'         => 'Видео не должно превышать 500 МБ.',
+            'file.mimetypes' => 'Допустимые форматы видео: MP4, WebM, MOV.',
+            'file.max' => 'Видео не должно превышать 500 МБ.',
         ]);
 
         $path = null;
@@ -37,13 +37,13 @@ class DocumentMaterialController extends Controller
         }
 
         $material = $document->materials()->create([
-            'kind'             => $data['kind'],
-            'title'            => $data['title'],
-            'body'             => $data['kind'] === DocumentMaterial::KIND_TEXT ? ($data['body'] ?? null) : null,
-            'file_path'        => $path,
+            'kind' => $data['kind'],
+            'title' => $data['title'],
+            'body' => $data['kind'] === DocumentMaterial::KIND_TEXT ? ($data['body'] ?? null) : null,
+            'file_path' => $path,
             'duration_seconds' => $data['kind'] === DocumentMaterial::KIND_VIDEO ? ($data['duration_seconds'] ?? null) : null,
-            'is_required'      => $request->boolean('is_required', true),
-            'sort_order'       => ((int) $document->materials()->max('sort_order')) + 1,
+            'is_required' => $request->boolean('is_required', true),
+            'sort_order' => ((int) $document->materials()->max('sort_order')) + 1,
         ]);
 
         $this->audit($request, 'create', $material, "Добавлен материал «{$material->title}» к документу {$document->display_name}");
@@ -54,18 +54,20 @@ class DocumentMaterialController extends Controller
     public function update(Request $request, DocumentMaterial $material)
     {
         $data = $request->validate([
-            'title'       => ['required', 'string', 'max:255'],
-            'body'        => ['nullable', 'string', 'max:5000'],
+            'title' => ['required', 'string', 'max:255'],
+            'body' => ['nullable', 'string', 'max:5000'],
             'is_required' => ['boolean'],
-            'sort_order'  => ['nullable', 'integer', 'min:0', 'max:65535'],
+            'sort_order' => ['nullable', 'integer', 'min:0', 'max:65535'],
         ]);
 
         $material->update([
-            'title'       => $data['title'],
-            'body'        => $material->isVideo() ? null : ($data['body'] ?? null),
+            'title' => $data['title'],
+            'body' => $material->isVideo() ? null : ($data['body'] ?? null),
             'is_required' => $request->boolean('is_required', $material->is_required),
-            'sort_order'  => $data['sort_order'] ?? $material->sort_order,
+            'sort_order' => $data['sort_order'] ?? $material->sort_order,
         ]);
+
+        $this->audit($request, 'update', $material, "Изменён материал «{$material->title}» документа {$material->document->display_name}");
 
         return back()->with('success', 'Материал обновлён.');
     }
@@ -73,7 +75,7 @@ class DocumentMaterialController extends Controller
     public function destroy(Request $request, DocumentMaterial $material)
     {
         $title = $material->title;
-        $doc   = $material->document;
+        $doc = $material->document;
 
         if ($material->file_path) {
             Storage::disk('local')->delete($material->file_path);
@@ -88,18 +90,18 @@ class DocumentMaterialController extends Controller
     // Предпросмотр видео администратором (у сотрудника — отдельный маршрут с проверкой назначения)
     public function preview(DocumentMaterial $material)
     {
-        abort_if(!$material->isVideo() || !$material->file_path, 404);
+        abort_if(! $material->isVideo() || ! $material->file_path, 404);
 
         $path = Storage::disk('local')->path($material->file_path);
-        abort_if(!file_exists($path), 404);
+        abort_if(! file_exists($path), 404);
 
         return response()->file($path, [
-            'Content-Type'           => match (strtolower(pathinfo($path, PATHINFO_EXTENSION))) {
-                'webm'  => 'video/webm',
-                'mov'   => 'video/quicktime',
+            'Content-Type' => match (strtolower(pathinfo($path, PATHINFO_EXTENSION))) {
+                'webm' => 'video/webm',
+                'mov' => 'video/quicktime',
                 default => 'video/mp4',
             },
-            'Cache-Control'          => 'private, no-transform',
+            'Cache-Control' => 'private, no-transform',
             'X-Content-Type-Options' => 'nosniff',
         ]);
     }
@@ -107,14 +109,14 @@ class DocumentMaterialController extends Controller
     private function audit(Request $request, string $action, DocumentMaterial $material, string $description): void
     {
         AuditLog::create([
-            'user_id'     => auth()->id(),
-            'user_name'   => auth()->user()->full_name,
-            'action'      => $action,
-            'model_type'  => 'DocumentMaterial',
-            'model_id'    => $material->id,
-            'ip_address'  => $request->ip(),
+            'user_id' => auth()->id(),
+            'user_name' => auth()->user()->full_name,
+            'action' => $action,
+            'model_type' => 'DocumentMaterial',
+            'model_id' => $material->id,
+            'ip_address' => $request->ip(),
             'description' => $description,
-            'created_at'  => now(),
+            'created_at' => now(),
         ]);
     }
 }

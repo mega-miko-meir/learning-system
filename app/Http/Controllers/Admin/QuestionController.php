@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\Question;
 use App\Models\Test;
 use Illuminate\Http\Request;
@@ -13,7 +14,7 @@ class QuestionController extends Controller
     public function index(Test $test)
     {
         return Inertia::render('Admin/Questions/Index', [
-            'test'      => $test,
+            'test' => $test,
             'questions' => $test->questions()->with('answers')->orderBy('order_number')->get(),
         ]);
     }
@@ -26,16 +27,18 @@ class QuestionController extends Controller
     public function store(Request $request, Test $test)
     {
         $data = $request->validate([
-            'text'  => ['required', 'string'],
-            'type'  => ['required', 'in:single,multiple'],
+            'text' => ['required', 'string'],
+            'type' => ['required', 'in:single,multiple'],
             'order' => ['nullable', 'integer'],
         ]);
 
-        $test->questions()->create([
+        $question = $test->questions()->create([
             'question_text' => $data['text'],
             'question_type' => $data['type'],
-            'order_number'  => $data['order'] ?? 0,
+            'order_number' => $data['order'] ?? 0,
         ]);
+
+        AuditLog::log('create', 'Question', $question->id, "Добавлен вопрос в тест «{$test->title}»: {$question->question_text}");
 
         return redirect()->route('admin.tests.show', $test)->with('success', 'Вопрос добавлен.');
     }
@@ -50,7 +53,7 @@ class QuestionController extends Controller
     public function edit(Question $question)
     {
         return Inertia::render('Admin/Questions/Form', [
-            'test'     => $question->test,
+            'test' => $question->test,
             'question' => $question->load('answers'),
         ]);
     }
@@ -58,16 +61,18 @@ class QuestionController extends Controller
     public function update(Request $request, Question $question)
     {
         $data = $request->validate([
-            'text'  => ['required', 'string'],
-            'type'  => ['required', 'in:single,multiple'],
+            'text' => ['required', 'string'],
+            'type' => ['required', 'in:single,multiple'],
             'order' => ['nullable', 'integer'],
         ]);
 
         $question->update([
             'question_text' => $data['text'],
             'question_type' => $data['type'],
-            'order_number'  => $data['order'] ?? $question->order_number,
+            'order_number' => $data['order'] ?? $question->order_number,
         ]);
+
+        AuditLog::log('update', 'Question', $question->id, "Изменён вопрос: {$question->question_text}");
 
         return redirect()->route('admin.tests.show', $question->test_id)->with('success', 'Вопрос обновлён.');
     }
@@ -75,7 +80,10 @@ class QuestionController extends Controller
     public function destroy(Question $question)
     {
         $testId = $question->test_id;
+        $text = $question->question_text;
         $question->delete();
+
+        AuditLog::log('delete', 'Question', $question->id, "Удалён вопрос из теста #{$testId}: {$text}");
 
         return redirect()->route('admin.tests.show', $testId)->with('success', 'Вопрос удалён.');
     }

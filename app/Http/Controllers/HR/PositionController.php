@@ -4,6 +4,7 @@ namespace App\Http\Controllers\HR;
 
 use App\Exports\PositionsExport;
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\Department;
 use App\Models\Position;
 use Illuminate\Http\Request;
@@ -19,9 +20,9 @@ class PositionController extends Controller
             ->active()
             ->orderBy('name')
             ->get()
-            ->map(fn($p) => [
-                'id'         => $p->id,
-                'name'       => $p->name,
+            ->map(fn ($p) => [
+                'id' => $p->id,
+                'name' => $p->name,
                 'department' => $p->department?->name,
             ]);
 
@@ -38,11 +39,13 @@ class PositionController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'name'          => ['required', 'string', 'max:150'],
+            'name' => ['required', 'string', 'max:150'],
             'department_id' => ['required', 'exists:departments,id'],
         ]);
 
-        Position::create([...$data, 'is_active' => true]);
+        $position = Position::create([...$data, 'is_active' => true]);
+
+        AuditLog::log('create', 'Position', $position->id, "Создана должность: {$position->name}");
 
         return redirect()->route('hr.positions.index')->with('success', 'Должность создана.');
     }
@@ -53,10 +56,10 @@ class PositionController extends Controller
 
         return Inertia::render('HR/Positions/Form', [
             'position' => [
-                'id'            => $position->id,
-                'name'          => $position->name,
+                'id' => $position->id,
+                'name' => $position->name,
                 'department_id' => $position->department_id,
-                'is_active'     => $position->is_active,
+                'is_active' => $position->is_active,
             ],
             'departments' => $departments,
         ]);
@@ -65,19 +68,22 @@ class PositionController extends Controller
     public function update(Request $request, Position $position)
     {
         $data = $request->validate([
-            'name'          => ['required', 'string', 'max:150', Rule::unique('positions', 'name')->where('department_id', $request->department_id)->ignore($position->id)],
+            'name' => ['required', 'string', 'max:150', Rule::unique('positions', 'name')->where('department_id', $request->department_id)->ignore($position->id)],
             'department_id' => ['required', 'exists:departments,id'],
-            'is_active'     => ['boolean'],
+            'is_active' => ['boolean'],
         ]);
 
+        $oldValues = $position->only(array_keys($data));
         $position->update($data);
+
+        AuditLog::log('update', 'Position', $position->id, "Изменена должность: {$position->name}", $oldValues, $data);
 
         return redirect()->route('hr.positions.index')->with('success', 'Должность обновлена.');
     }
 
     public function export()
     {
-        $filename = 'positions_' . now()->format('Ymd_His') . '.xlsx';
+        $filename = 'positions_'.now()->format('Ymd_His').'.xlsx';
 
         return Excel::download(new PositionsExport, $filename);
     }

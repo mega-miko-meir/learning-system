@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Exports\PositionsExport;
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\Department;
 use App\Models\Position;
 use Illuminate\Http\Request;
@@ -18,12 +19,12 @@ class PositionController extends Controller
         $positions = Position::with('department')
             ->orderBy('name')
             ->get()
-            ->map(fn($p) => [
-                'id'            => $p->id,
-                'name'          => $p->name,
-                'department'    => $p->department?->name,
+            ->map(fn ($p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'department' => $p->department?->name,
                 'department_id' => $p->department_id,
-                'is_active'     => $p->is_active,
+                'is_active' => $p->is_active,
             ]);
 
         $departments = Department::active()->orderBy('name')->get(['id', 'name']);
@@ -41,11 +42,13 @@ class PositionController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'name'          => ['required', 'string', 'max:150'],
+            'name' => ['required', 'string', 'max:150'],
             'department_id' => ['required', 'exists:departments,id'],
         ]);
 
-        Position::create([...$data, 'is_active' => true]);
+        $position = Position::create([...$data, 'is_active' => true]);
+
+        AuditLog::log('create', 'Position', $position->id, "Создана должность: {$position->name}");
 
         return redirect()->route('admin.positions.index')->with('success', 'Должность создана.');
     }
@@ -67,12 +70,15 @@ class PositionController extends Controller
     public function update(Request $request, Position $position)
     {
         $data = $request->validate([
-            'name'          => ['required', 'string', 'max:150', Rule::unique('positions', 'name')->where('department_id', $request->department_id)->ignore($position->id)],
+            'name' => ['required', 'string', 'max:150', Rule::unique('positions', 'name')->where('department_id', $request->department_id)->ignore($position->id)],
             'department_id' => ['required', 'exists:departments,id'],
-            'is_active'     => ['boolean'],
+            'is_active' => ['boolean'],
         ]);
 
+        $oldValues = $position->only(array_keys($data));
         $position->update($data);
+
+        AuditLog::log('update', 'Position', $position->id, "Изменена должность: {$position->name}", $oldValues, $data);
 
         return redirect()->route('admin.positions.index')->with('success', 'Должность обновлена.');
     }
@@ -81,6 +87,8 @@ class PositionController extends Controller
     {
         $position->update(['is_active' => false]);
 
+        AuditLog::log('deactivate', 'Position', $position->id, "Деактивирована должность: {$position->name}");
+
         return back()->with('success', 'Должность деактивирована.');
     }
 
@@ -88,7 +96,7 @@ class PositionController extends Controller
     {
         $export = new PositionsExport(departmentId: $request->integer('department_id') ?: null);
 
-        $filename = 'positions_' . now()->format('Ymd_His') . '.xlsx';
+        $filename = 'positions_'.now()->format('Ymd_His').'.xlsx';
 
         return Excel::download($export, $filename);
     }

@@ -8,9 +8,10 @@ use App\Models\AuditLog;
 use App\Models\Document;
 use App\Models\Question;
 use App\Models\Test;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Inertia\Inertia;
+use Smalot\PdfParser\Parser;
 
 class TestController extends Controller
 {
@@ -19,13 +20,13 @@ class TestController extends Controller
         $tests = Test::with('document')
             ->latest()
             ->paginate(20)
-            ->through(fn($t) => [
-                'id'              => $t->id,
-                'title'           => $t->title,
-                'document'        => $t->document?->display_name,
+            ->through(fn ($t) => [
+                'id' => $t->id,
+                'title' => $t->title,
+                'document' => $t->document?->display_name,
                 'questions_count' => $t->questions()->where('is_active', true)->count(),
-                'passing_score'   => $t->passing_score,
-                'is_active'       => $t->is_active,
+                'passing_score' => $t->passing_score,
+                'is_active' => $t->is_active,
             ]);
 
         return Inertia::render('Admin/Tests/Index', compact('tests'));
@@ -36,54 +37,57 @@ class TestController extends Controller
         $documents = Document::active()->orderBy('description')->get(['id', 'title', 'description', 'type', 'version']);
 
         return Inertia::render('Admin/Tests/Create', [
-            'documents'   => $documents,
+            'documents' => $documents,
             'document_id' => $request->input('document_id', ''),
-            'test'        => null,
+            'test' => null,
         ]);
     }
 
     public function store(Request $request)
     {
         $request->merge([
-            'document_id'  => $request->filled('document_id') ? $request->document_id : null,
-            'time_limit'   => $request->filled('time_limit')  ? (int) $request->time_limit : null,
+            'document_id' => $request->filled('document_id') ? $request->document_id : null,
+            'time_limit' => $request->filled('time_limit') ? (int) $request->time_limit : null,
             'max_attempts' => $request->filled('max_attempts') ? (int) $request->max_attempts : 3,
         ]);
 
         $request->validate([
-            'title'                            => ['required', 'string', 'max:255'],
-            'document_id'                      => ['nullable', 'exists:documents,id'],
-            'passing_score'                    => ['required', 'integer', 'min:1', 'max:100'],
-            'time_limit'                       => ['nullable', 'integer', 'min:1'],
-            'max_attempts'                     => ['required', 'integer', 'min:1', 'max:10'],
-            'questions'                        => ['nullable', 'array'],
-            'questions.*.text'                 => ['required_with:questions', 'string', 'max:1000'],
-            'questions.*.type'                 => ['required_with:questions', 'in:single,multiple'],
-            'questions.*.answers'              => ['nullable', 'array'],
-            'questions.*.answers.*.text'       => ['required', 'string', 'max:500'],
+            'title' => ['required', 'string', 'max:255'],
+            'document_id' => ['nullable', 'exists:documents,id'],
+            'passing_score' => ['required', 'integer', 'min:1', 'max:100'],
+            'time_limit' => ['nullable', 'integer', 'min:1'],
+            'max_attempts' => ['required', 'integer', 'min:1', 'max:10'],
+            'questions' => ['nullable', 'array'],
+            'questions.*.text' => ['required_with:questions', 'string', 'max:1000'],
+            'questions.*.type' => ['required_with:questions', 'in:single,multiple'],
+            'questions.*.answers' => ['nullable', 'array'],
+            'questions.*.answers.*.text' => ['required', 'string', 'max:500'],
             'questions.*.answers.*.is_correct' => ['boolean'],
         ]);
 
         if ($request->document_id) {
             $existing = Test::where('document_id', $request->document_id)->first();
             if ($existing) {
-                if (!$request->boolean('force_replace')) {
+                if (! $request->boolean('force_replace')) {
                     return back()->withErrors(['document_conflict' => $existing->title])->withInput();
                 }
                 $existing->update(['document_id' => null]);
+                AuditLog::log('update', 'Test', $existing->id, "Тест «{$existing->title}» откреплён от документа (заменён другим тестом)");
             }
         }
 
         $test = Test::create([
-            'title'              => $request->title,
-            'document_id'        => $request->document_id,
-            'pass_percentage'    => $request->passing_score,
+            'title' => $request->title,
+            'document_id' => $request->document_id,
+            'pass_percentage' => $request->passing_score,
             'time_limit_minutes' => $request->time_limit,
-            'max_attempts'       => $request->max_attempts,
-            'is_active'          => true,
+            'max_attempts' => $request->max_attempts,
+            'is_active' => true,
         ]);
 
         $this->syncQuestions($test, $request->questions ?? []);
+
+        AuditLog::log('create', 'Test', $test->id, "Создан тест «{$test->title}» (вопросов: ".count($request->questions ?? []).')');
 
         return redirect()->route('admin.tests.show', $test)->with('success', 'Тест создан.');
     }
@@ -91,7 +95,7 @@ class TestController extends Controller
     public function show(Test $test)
     {
         $test->load([
-            'questions' => fn($q) => $q->where('is_active', true)->orderBy('order_number'),
+            'questions' => fn ($q) => $q->where('is_active', true)->orderBy('order_number'),
             'questions.answers',
         ]);
 
@@ -101,27 +105,27 @@ class TestController extends Controller
     public function edit(Test $test)
     {
         $test->load([
-            'questions' => fn($q) => $q->where('is_active', true)->orderBy('order_number'),
+            'questions' => fn ($q) => $q->where('is_active', true)->orderBy('order_number'),
             'questions.answers',
         ]);
         $documents = Document::active()->orderBy('description')->get(['id', 'title', 'description', 'type', 'version']);
 
         return Inertia::render('Admin/Tests/Create', [
-            'documents'   => $documents,
+            'documents' => $documents,
             'document_id' => '',
-            'test'        => [
-                'id'            => $test->id,
-                'title'         => $test->title,
-                'document_id'   => $test->document_id,
+            'test' => [
+                'id' => $test->id,
+                'title' => $test->title,
+                'document_id' => $test->document_id,
                 'passing_score' => $test->pass_percentage,
-                'time_limit'    => $test->time_limit_minutes,
-                'max_attempts'  => $test->max_attempts ?? 3,
-                'is_active'     => $test->is_active,
-                'questions'     => $test->questions->map(fn($q) => [
-                    'text'    => $q->question_text,
-                    'type'    => $q->question_type,
-                    'answers' => $q->answers->map(fn($a) => [
-                        'text'       => $a->answer_text,
+                'time_limit' => $test->time_limit_minutes,
+                'max_attempts' => $test->max_attempts ?? 3,
+                'is_active' => $test->is_active,
+                'questions' => $test->questions->map(fn ($q) => [
+                    'text' => $q->question_text,
+                    'type' => $q->question_type,
+                    'answers' => $q->answers->map(fn ($a) => [
+                        'text' => $a->answer_text,
                         'is_correct' => (bool) $a->is_correct,
                     ])->toArray(),
                 ])->toArray(),
@@ -132,49 +136,60 @@ class TestController extends Controller
     public function update(Request $request, Test $test)
     {
         $request->merge([
-            'document_id'  => $request->filled('document_id') ? $request->document_id : null,
-            'time_limit'   => $request->filled('time_limit')  ? (int) $request->time_limit : null,
+            'document_id' => $request->filled('document_id') ? $request->document_id : null,
+            'time_limit' => $request->filled('time_limit') ? (int) $request->time_limit : null,
             'max_attempts' => $request->filled('max_attempts') ? (int) $request->max_attempts : 3,
         ]);
 
         $request->validate([
-            'title'                            => ['required', 'string', 'max:255'],
-            'document_id'                      => ['nullable', 'exists:documents,id'],
-            'passing_score'                    => ['required', 'integer', 'min:1', 'max:100'],
-            'time_limit'                       => ['nullable', 'integer', 'min:1'],
-            'max_attempts'                     => ['required', 'integer', 'min:1', 'max:10'],
-            'is_active'                        => ['boolean'],
-            'questions'                        => ['nullable', 'array'],
-            'questions.*.text'                 => ['required_with:questions', 'string', 'max:1000'],
-            'questions.*.type'                 => ['required_with:questions', 'in:single,multiple'],
-            'questions.*.answers'              => ['nullable', 'array'],
-            'questions.*.answers.*.text'       => ['required', 'string', 'max:500'],
+            'title' => ['required', 'string', 'max:255'],
+            'document_id' => ['nullable', 'exists:documents,id'],
+            'passing_score' => ['required', 'integer', 'min:1', 'max:100'],
+            'time_limit' => ['nullable', 'integer', 'min:1'],
+            'max_attempts' => ['required', 'integer', 'min:1', 'max:10'],
+            'is_active' => ['boolean'],
+            'questions' => ['nullable', 'array'],
+            'questions.*.text' => ['required_with:questions', 'string', 'max:1000'],
+            'questions.*.type' => ['required_with:questions', 'in:single,multiple'],
+            'questions.*.answers' => ['nullable', 'array'],
+            'questions.*.answers.*.text' => ['required', 'string', 'max:500'],
             'questions.*.answers.*.is_correct' => ['boolean'],
         ]);
 
         if ($request->document_id) {
             $existing = Test::where('document_id', $request->document_id)->where('id', '!=', $test->id)->first();
             if ($existing) {
-                if (!$request->boolean('force_replace')) {
+                if (! $request->boolean('force_replace')) {
                     return back()->withErrors(['document_conflict' => $existing->title])->withInput();
                 }
                 $existing->update(['document_id' => null]);
+                AuditLog::log('update', 'Test', $existing->id, "Тест «{$existing->title}» откреплён от документа (заменён другим тестом)");
             }
         }
 
+        $oldTitle = $test->title;
+        $oldQuestionsCount = $test->questions()->where('is_active', true)->count();
+
         $test->update([
-            'title'              => $request->title,
-            'document_id'        => $request->document_id,
-            'pass_percentage'    => $request->passing_score,
+            'title' => $request->title,
+            'document_id' => $request->document_id,
+            'pass_percentage' => $request->passing_score,
             'time_limit_minutes' => $request->time_limit,
-            'max_attempts'       => $request->max_attempts,
-            'is_active'          => $request->boolean('is_active', $test->is_active),
+            'max_attempts' => $request->max_attempts,
+            'is_active' => $request->boolean('is_active', $test->is_active),
         ]);
 
         // Деактивируем старые вопросы и создаём новые
         // (исторические AttemptAnswer записи сохраняют ссылки на старые question_id)
         $test->questions()->update(['is_active' => false]);
         $this->syncQuestions($test, $request->questions ?? []);
+
+        AuditLog::log(
+            'update',
+            'Test',
+            $test->id,
+            "Отредактирован тест «{$oldTitle}»: вопросов было {$oldQuestionsCount}, стало ".count($request->questions ?? [])
+        );
 
         return redirect()->route('admin.tests.show', $test)->with('success', 'Тест обновлён.');
     }
@@ -183,46 +198,48 @@ class TestController extends Controller
     {
         $test->update(['is_active' => false]);
 
+        AuditLog::log('deactivate', 'Test', $test->id, "Деактивирован тест: {$test->title}");
+
         return back()->with('success', 'Тест деактивирован.');
     }
 
     public function forceDestroy(Test $test)
     {
         $title = $test->title;
-        $id    = $test->id;
+        $id = $test->id;
 
         // Каскадное удаление через onDelete('cascade') в БД:
         // questions → answers, test_attempts → attempt_answers
         $test->delete();
 
         AuditLog::create([
-            'user_id'     => auth()->id(),
-            'user_name'   => auth()->user()->full_name,
-            'action'      => 'delete',
-            'model_type'  => 'Test',
-            'model_id'    => $id,
-            'ip_address'  => request()->ip(),
+            'user_id' => auth()->id(),
+            'user_name' => auth()->user()->full_name,
+            'action' => 'delete',
+            'model_type' => 'Test',
+            'model_id' => $id,
+            'ip_address' => request()->ip(),
             'description' => "Удалён тест: {$title}",
-            'created_at'  => now(),
+            'created_at' => now(),
         ]);
 
         return redirect()->route('admin.tests.index')
             ->with('success', "Тест «{$title}» удалён.");
     }
 
-    public function parsePdf(Request $request): \Illuminate\Http\JsonResponse
+    public function parsePdf(Request $request): JsonResponse
     {
         $request->validate([
             'file' => ['required', 'file', 'max:10240'],
         ]);
 
-        $file      = $request->file('file');
+        $file = $request->file('file');
         $extension = strtolower($file->getClientOriginalExtension());
 
         // Проверяем по расширению, а не по mimes:pdf,docx — у .docx нет уникальной MIME-сигнатуры
         // (это ZIP-архив), и finfo нередко определяет реальные .docx как обычный application/zip,
         // что ложно отклоняло бы корректные файлы.
-        if (!in_array($extension, ['pdf', 'docx'], true)) {
+        if (! in_array($extension, ['pdf', 'docx'], true)) {
             return response()->json([
                 'error' => 'Поддерживаются только файлы PDF и Word (.docx).',
             ], 422);
@@ -233,16 +250,16 @@ class TestController extends Controller
                 ? $this->extractDocxText($file->getPathname())
                 : $this->extractPdfText($file->getPathname());
 
-            $lines     = array_values(array_filter(array_map('trim', explode("\n", $text))));
-            $title     = '';
+            $lines = array_values(array_filter(array_map('trim', explode("\n", $text))));
+            $title = '';
             $bodyStart = 0;
 
-            if (!empty($lines) && !preg_match('/^\d+\./', $lines[0])) {
-                $title     = $lines[0];
+            if (! empty($lines) && ! preg_match('/^\d+\./', $lines[0])) {
+                $title = $lines[0];
                 $bodyStart = 1;
             }
 
-            $body      = implode("\n", array_slice($lines, $bodyStart));
+            $body = implode("\n", array_slice($lines, $bodyStart));
             $questions = $this->parseQuestionsFromText($body);
 
             if (empty($questions)) {
@@ -255,15 +272,15 @@ class TestController extends Controller
 
         } catch (\Exception $e) {
             return response()->json([
-                'error' => 'Не удалось прочитать файл: ' . $e->getMessage(),
+                'error' => 'Не удалось прочитать файл: '.$e->getMessage(),
             ], 422);
         }
     }
 
     private function extractPdfText(string $path): string
     {
-        $parser = new \Smalot\PdfParser\Parser();
-        $pdf    = $parser->parseFile($path);
+        $parser = new Parser;
+        $pdf = $parser->parseFile($path);
 
         return str_replace(["\r\n", "\r"], "\n", $pdf->getText());
     }
@@ -272,12 +289,12 @@ class TestController extends Controller
     // Полноценный парсер (phpoffice/phpword) избыточен — нам нужен только простой текст для шаблона.
     private function extractDocxText(string $path): string
     {
-        $zip = new \ZipArchive();
+        $zip = new \ZipArchive;
         if ($zip->open($path) !== true) {
             throw new \RuntimeException('не удалось открыть файл как .docx');
         }
 
-        $xml          = $zip->getFromName('word/document.xml');
+        $xml = $zip->getFromName('word/document.xml');
         $numberingXml = $zip->getFromName('word/numbering.xml'); // может отсутствовать, если списков нет
         $zip->close();
 
@@ -286,7 +303,7 @@ class TestController extends Controller
         }
 
         $numFormats = $numberingXml !== false ? $this->parseDocxNumbering($numberingXml) : [];
-        $counters   = [];
+        $counters = [];
 
         preg_match_all('/<w:p\b.*?<\/w:p>/s', $xml, $paragraphs);
 
@@ -298,26 +315,26 @@ class TestController extends Controller
             $marker = '';
             if (preg_match('/<w:numPr>.*?<\/w:numPr>/s', $paragraphXml, $numPr)
                 && preg_match('/<w:numId w:val="(\d+)"/', $numPr[0], $numIdM)) {
-                $ilvl  = preg_match('/<w:ilvl w:val="(\d+)"/', $numPr[0], $ilvlM) ? $ilvlM[1] : '0';
+                $ilvl = preg_match('/<w:ilvl w:val="(\d+)"/', $numPr[0], $ilvlM) ? $ilvlM[1] : '0';
                 $numId = $numIdM[1];
-                $fmt   = $numFormats[$numId][$ilvl] ?? null;
+                $fmt = $numFormats[$numId][$ilvl] ?? null;
 
                 if ($fmt) {
                     $key = "{$numId}:{$ilvl}";
-                    $n   = ($counters[$key] ?? 0) + 1;
+                    $n = ($counters[$key] ?? 0) + 1;
                     $counters[$key] = $n;
 
                     $marker = match ($fmt) {
-                        'decimal'     => "{$n}. ",
-                        'lowerLetter' => chr(96 + $n) . ') ',
-                        'upperLetter' => chr(64 + $n) . ') ',
-                        default       => '',
+                        'decimal' => "{$n}. ",
+                        'lowerLetter' => chr(96 + $n).') ',
+                        'upperLetter' => chr(64 + $n).') ',
+                        default => '',
                     };
                 }
             }
 
             $paragraphXml = preg_replace(['/<w:br\s*\/?>/', '/<w:tab\s*\/?>/'], ["\n", "\t"], $paragraphXml);
-            $lines[] = $marker . strip_tags($paragraphXml);
+            $lines[] = $marker.strip_tags($paragraphXml);
         }
 
         return html_entity_decode(implode("\n", $lines), ENT_QUOTES | ENT_XML1, 'UTF-8');
@@ -357,40 +374,44 @@ class TestController extends Controller
 
         foreach ($blocks as $block) {
             $block = trim($block);
-            if (empty($block) || !preg_match('/^\d+\./', $block)) {
+            if (empty($block) || ! preg_match('/^\d+\./', $block)) {
                 continue;
             }
 
             $lines = array_values(array_filter(
                 array_map('trim', explode("\n", $block)),
-                fn($l) => $l !== ''
+                fn ($l) => $l !== ''
             ));
 
-            if (empty($lines)) continue;
+            if (empty($lines)) {
+                continue;
+            }
 
             $questionLine = preg_replace('/^\d+\.\s*/', '', $lines[0]);
 
             $type = 'single';
             if (preg_match('/\[multiple\]/i', $questionLine)) {
-                $type         = 'multiple';
+                $type = 'multiple';
                 $questionLine = trim(preg_replace('/\[multiple\]/i', '', $questionLine));
             }
 
             $questionText = trim($questionLine);
-            if (empty($questionText)) continue;
+            if (empty($questionText)) {
+                continue;
+            }
 
             $answers = [];
             for ($i = 1; $i < count($lines); $i++) {
                 $line = $lines[$i];
-                if (!preg_match('/^[a-zа-яёA-ZА-ЯЁ]\)\s*(.*)/u', $line, $match)) {
+                if (! preg_match('/^[a-zа-яёA-ZА-ЯЁ]\)\s*(.*)/u', $line, $match)) {
                     continue;
                 }
 
                 $answerText = trim($match[1]);
-                $isCorrect  = false;
+                $isCorrect = false;
 
                 if (str_ends_with($answerText, '*')) {
-                    $isCorrect  = true;
+                    $isCorrect = true;
                     $answerText = trim(rtrim($answerText, '* '));
                 }
 
@@ -401,8 +422,8 @@ class TestController extends Controller
 
             if (count($answers) >= 2) {
                 $questions[] = [
-                    'text'    => $questionText,
-                    'type'    => $type,
+                    'text' => $questionText,
+                    'type' => $type,
                     'answers' => $answers,
                 ];
             }
@@ -415,18 +436,18 @@ class TestController extends Controller
     {
         foreach ($questions as $qi => $qData) {
             $question = Question::create([
-                'test_id'       => $test->id,
+                'test_id' => $test->id,
                 'question_text' => $qData['text'],
                 'question_type' => $qData['type'],
-                'order_number'  => $qi + 1,
-                'is_active'     => true,
+                'order_number' => $qi + 1,
+                'is_active' => true,
             ]);
 
             foreach ($qData['answers'] ?? [] as $ai => $aData) {
                 Answer::create([
-                    'question_id'  => $question->id,
-                    'answer_text'  => $aData['text'],
-                    'is_correct'   => (bool) ($aData['is_correct'] ?? false),
+                    'question_id' => $question->id,
+                    'answer_text' => $aData['text'],
+                    'is_correct' => (bool) ($aData['is_correct'] ?? false),
                     'order_number' => $ai + 1,
                 ]);
             }
