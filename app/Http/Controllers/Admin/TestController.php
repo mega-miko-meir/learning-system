@@ -277,20 +277,76 @@ class TestController extends Controller
             throw new \RuntimeException('не удалось открыть файл как .docx');
         }
 
-        $xml = $zip->getFromName('word/document.xml');
+        $xml          = $zip->getFromName('word/document.xml');
+        $numberingXml = $zip->getFromName('word/numbering.xml'); // может отсутствовать, если списков нет
         $zip->close();
 
         if ($xml === false) {
             throw new \RuntimeException('файл повреждён или это не .docx');
         }
 
-        // Конец параграфа/разрыв строки → перевод строки, чтобы разбиение по вопросам работало как в PDF.
-        $xml  = preg_replace('/<\/w:p>/', "\n", $xml);
-        $xml  = preg_replace('/<w:br\s*\/?>/', "\n", $xml);
-        $xml  = preg_replace('/<w:tab\s*\/?>/', "\t", $xml);
-        $text = strip_tags($xml);
+        $numFormats = $numberingXml !== false ? $this->parseDocxNumbering($numberingXml) : [];
+        $counters   = [];
 
-        return html_entity_decode($text, ENT_QUOTES | ENT_XML1, 'UTF-8');
+        preg_match_all('/<w:p\b.*?<\/w:p>/s', $xml, $paragraphs);
+
+        $lines = [];
+        foreach ($paragraphs[0] as $paragraphXml) {
+            // Автонумерация Word (списки «1, 2, 3…» / «a, b, c…» из меню форматирования): сам номер
+            // не хранится как текст — его рисует Word при отображении. Подставляем такой же
+            // литеральный маркер («1.», «a)»), какого ждёт шаблон при вводе текста вручную или в PDF.
+            $marker = '';
+            if (preg_match('/<w:numPr>.*?<\/w:numPr>/s', $paragraphXml, $numPr)
+                && preg_match('/<w:numId w:val="(\d+)"/', $numPr[0], $numIdM)) {
+                $ilvl  = preg_match('/<w:ilvl w:val="(\d+)"/', $numPr[0], $ilvlM) ? $ilvlM[1] : '0';
+                $numId = $numIdM[1];
+                $fmt   = $numFormats[$numId][$ilvl] ?? null;
+
+                if ($fmt) {
+                    $key = "{$numId}:{$ilvl}";
+                    $n   = ($counters[$key] ?? 0) + 1;
+                    $counters[$key] = $n;
+
+                    $marker = match ($fmt) {
+                        'decimal'     => "{$n}. ",
+                        'lowerLetter' => chr(96 + $n) . ') ',
+                        'upperLetter' => chr(64 + $n) . ') ',
+                        default       => '',
+                    };
+                }
+            }
+
+            $paragraphXml = preg_replace(['/<w:br\s*\/?>/', '/<w:tab\s*\/?>/'], ["\n", "\t"], $paragraphXml);
+            $lines[] = $marker . strip_tags($paragraphXml);
+        }
+
+        return html_entity_decode(implode("\n", $lines), ENT_QUOTES | ENT_XML1, 'UTF-8');
+    }
+
+    // word/numbering.xml → [numId => [ilvl => numFmt]] (decimal/lowerLetter/upperLetter/...).
+    private function parseDocxNumbering(string $xml): array
+    {
+        $abstractFormats = [];
+        if (preg_match_all('/<w:abstractNum w:abstractNumId="(\d+)".*?<\/w:abstractNum>/s', $xml, $abstracts, PREG_SET_ORDER)) {
+            foreach ($abstracts as $abstract) {
+                if (preg_match_all('/<w:lvl w:ilvl="(\d+)".*?<w:numFmt w:val="(\w+)"/s', $abstract[0], $levels, PREG_SET_ORDER)) {
+                    foreach ($levels as $level) {
+                        $abstractFormats[$abstract[1]][$level[1]] = $level[2];
+                    }
+                }
+            }
+        }
+
+        $result = [];
+        if (preg_match_all('/<w:num w:numId="(\d+)"[^>]*>\s*<w:abstractNumId w:val="(\d+)"/s', $xml, $nums, PREG_SET_ORDER)) {
+            foreach ($nums as $num) {
+                if (isset($abstractFormats[$num[2]])) {
+                    $result[$num[1]] = $abstractFormats[$num[2]];
+                }
+            }
+        }
+
+        return $result;
     }
 
     private function parseQuestionsFromText(string $text): array
