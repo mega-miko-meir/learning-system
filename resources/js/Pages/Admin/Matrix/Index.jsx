@@ -1,6 +1,7 @@
 import { Head, router } from "@inertiajs/react";
 import { useState, useMemo } from "react";
 import AppLayout from "../../../Layouts/AppLayout";
+import SearchableSelect from "../../../Components/SearchableSelect";
 
 const TRAINING_TYPES = [
     { value: "primary",   label: "Первичное" },
@@ -508,27 +509,21 @@ export default function MatrixIndex({ matrix, positions, documents, departments 
                                 )}
                             </div>
 
-                            <select
+                            <SearchableSelect
+                                className="w-44"
                                 value={filterDept}
-                                onChange={(e) => handleFilterDeptChange(e.target.value)}
-                                className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                                <option value="">Все отделы</option>
-                                {departments.map((d) => (
-                                    <option key={d.id} value={d.id}>{d.name}</option>
-                                ))}
-                            </select>
+                                onChange={handleFilterDeptChange}
+                                options={departments.map((d) => ({ value: String(d.id), label: d.name }))}
+                                placeholder="Все отделы"
+                            />
 
-                            <select
+                            <SearchableSelect
+                                className="w-44"
                                 value={filterPos}
-                                onChange={(e) => setFilterPos(e.target.value ? Number(e.target.value) : "")}
-                                className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                                <option value="">Все должности</option>
-                                {filteredPositionsForFilter.map((p) => (
-                                    <option key={p.id} value={p.id}>{p.name}</option>
-                                ))}
-                            </select>
+                                onChange={(v) => setFilterPos(v ? Number(v) : "")}
+                                options={filteredPositionsForFilter.map((p) => ({ value: String(p.id), label: p.name }))}
+                                placeholder="Все должности"
+                            />
                         </div>
                     </div>
 
