@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Document;
 use App\Models\Position;
+use App\Models\Test;
 use App\Models\TrainingAssignment;
 use App\Models\TrainingMatrix;
 use Illuminate\Http\Request;
@@ -175,6 +176,17 @@ class DocumentController extends Controller
                 'id'    => $document->test->id,
                 'title' => $document->test->title,
             ] : null,
+            // Тесты, которые можно привязать к этому документу вместо создания нового
+            // (свои у другого документа — тоже показываем, чтобы можно было перепривязать).
+            'availableTests' => $document->test ? [] : Test::with('document:id,title,description')
+                ->orderBy('title')
+                ->get(['id', 'title', 'document_id'])
+                ->map(fn($t) => [
+                    'id'              => $t->id,
+                    'title'           => $t->title,
+                    'document_title'  => $t->document?->display_name,
+                ])
+                ->values(),
             'materials' => (config('features.induction') && $document->isConfirmationMode())
                 ? $document->materials->map(fn($m) => [
                     'id'               => $m->id,
@@ -187,6 +199,46 @@ class DocumentController extends Controller
                 ])->values()
                 : [],
         ]);
+    }
+
+    // Привязка уже существующего теста к документу — обратная операция к выбору документа
+    // в форме теста. Меняет только document_id, вопросы/ответы теста не трогает.
+    public function attachTest(Request $request, Document $document)
+    {
+        $data = $request->validate([
+            'test_id'       => ['required', 'exists:tests,id'],
+            'force_replace' => ['boolean'],
+        ]);
+
+        if ($document->test) {
+            return back()->withErrors(['test_id' => 'К документу уже привязан тест.']);
+        }
+
+        $test = Test::findOrFail($data['test_id']);
+
+        if ($test->document_id && $test->document_id !== $document->id) {
+            if (!$request->boolean('force_replace')) {
+                return back()->withErrors(['test_conflict' => $test->title])->withInput();
+            }
+        }
+
+        $previousDocumentId = $test->document_id;
+        $test->update(['document_id' => $document->id]);
+
+        AuditLog::create([
+            'user_id'     => auth()->id(),
+            'user_name'   => auth()->user()->full_name,
+            'action'      => 'update',
+            'model_type'  => 'Test',
+            'model_id'    => $test->id,
+            'ip_address'  => $request->ip(),
+            'description' => $previousDocumentId
+                ? "Тест «{$test->title}» перепривязан к документу «{$document->display_name}»"
+                : "Тест «{$test->title}» привязан к документу «{$document->display_name}»",
+            'created_at'  => now(),
+        ]);
+
+        return back()->with('success', "Тест «{$test->title}» привязан к документу.");
     }
 
     public function edit(Document $document)

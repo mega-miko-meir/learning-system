@@ -1,14 +1,45 @@
 import { Head, Link, useForm, usePage, router } from "@inertiajs/react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import AppLayout from "../../../Layouts/AppLayout";
 import InductionMaterials from "../../../Components/InductionMaterials";
 
-export default function DocumentShow({ document: doc, test, materials = [] }) {
+export default function DocumentShow({ document: doc, test, materials = [], availableTests = [] }) {
     // Первичный инструктаж без теста включается флагом FEATURE_INDUCTION (config/features.php)
     const inductionEnabled = !!usePage().props.features?.induction;
     const isConfirmation = inductionEnabled && doc.completion_mode === "confirmation";
     const fileRef = useRef(null);
     const { data, setData, post, processing, errors } = useForm({ file: null });
+
+    const [selectedTestId, setSelectedTestId] = useState("");
+    const [attaching, setAttaching] = useState(false);
+    const [testConflict, setTestConflict] = useState(null); // { testTitle }
+
+    function attachExistingTest(forceReplace = false) {
+        if (!selectedTestId) return;
+        setAttaching(true);
+        router.post(
+            route("admin.documents.attach-test", doc.id),
+            { test_id: selectedTestId, force_replace: forceReplace },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSelectedTestId("");
+                    setTestConflict(null);
+                },
+                onError: (e) => {
+                    if (e.test_conflict) {
+                        setTestConflict({ testTitle: e.test_conflict });
+                    }
+                },
+                onFinish: () => setAttaching(false),
+            }
+        );
+    }
+
+    function confirmReplaceTest() {
+        setTestConflict(null);
+        attachExistingTest(true);
+    }
 
     function uploadNewVersion(e) {
         e.preventDefault();
@@ -127,6 +158,31 @@ export default function DocumentShow({ document: doc, test, materials = [] }) {
                                 <p className="text-xs text-orange-600 bg-orange-50 rounded-lg px-3 py-2">
                                     Тест не добавлен
                                 </p>
+                                {availableTests.length > 0 && (
+                                    <div className="space-y-1.5">
+                                        <select
+                                            value={selectedTestId}
+                                            onChange={(e) => setSelectedTestId(e.target.value)}
+                                            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 text-gray-700"
+                                        >
+                                            <option value="">Выбрать существующий тест…</option>
+                                            {availableTests.map((t) => (
+                                                <option key={t.id} value={t.id}>
+                                                    {t.title}
+                                                    {t.document_title ? ` (сейчас: ${t.document_title})` : ""}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <button
+                                            type="button"
+                                            onClick={() => attachExistingTest(false)}
+                                            disabled={!selectedTestId || attaching}
+                                            className="w-full px-4 py-2 text-sm border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-50 disabled:opacity-50"
+                                        >
+                                            {attaching ? "Привязываем..." : "Привязать выбранный тест"}
+                                        </button>
+                                    </div>
+                                )}
                                 <Link
                                     href={route("admin.tests.create") + `?document_id=${doc.id}`}
                                     className="inline-block w-full text-center px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -179,6 +235,44 @@ export default function DocumentShow({ document: doc, test, materials = [] }) {
                     />
                 </div>
             </div>
+
+            {testConflict && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6">
+                        <div className="flex items-start gap-3 mb-4">
+                            <div className="shrink-0 w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                                <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-semibold text-gray-900 mb-1">Тест уже привязан к другому документу</h3>
+                                <p className="text-sm text-gray-600">
+                                    Тест <span className="font-medium text-gray-800">«{testConflict.testTitle}»</span>{' '}
+                                    сейчас привязан к другому документу. Хотите открепить его оттуда и привязать к этому документу?
+                                </p>
+                                <p className="mt-1.5 text-xs text-gray-400">Тест не удалится — он просто останется без прежнего документа.</p>
+                            </div>
+                        </div>
+                        <div className="flex gap-2 justify-end">
+                            <button
+                                type="button"
+                                onClick={() => setTestConflict(null)}
+                                className="px-4 py-2 text-sm border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50"
+                            >
+                                Отмена
+                            </button>
+                            <button
+                                type="button"
+                                onClick={confirmReplaceTest}
+                                className="px-4 py-2 text-sm bg-amber-500 text-white font-medium rounded-xl hover:bg-amber-600"
+                            >
+                                Открепить и привязать
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </AppLayout>
     );
 }

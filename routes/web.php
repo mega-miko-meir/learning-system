@@ -91,6 +91,7 @@ Route::middleware(['auth', 'user.active'])->group(function () {
         // Документы
         Route::resource('documents', \App\Http\Controllers\Admin\DocumentController::class);
         Route::post('/documents/{document}/new-version', [\App\Http\Controllers\Admin\DocumentController::class, 'uploadNewVersion'])->name('documents.new-version');
+        Route::post('/documents/{document}/attach-test', [\App\Http\Controllers\Admin\DocumentController::class, 'attachTest'])->name('documents.attach-test');
         Route::delete('/documents/{document}/force', [\App\Http\Controllers\Admin\DocumentController::class, 'forceDestroy'])->name('documents.force-delete');
 
         // Материалы обучения без теста (видео, текстовые пункты) — за флагом FEATURE_INDUCTION
