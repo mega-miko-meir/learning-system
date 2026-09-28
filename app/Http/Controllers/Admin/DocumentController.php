@@ -176,16 +176,10 @@ class DocumentController extends Controller
                 'id'    => $document->test->id,
                 'title' => $document->test->title,
             ] : null,
-            // Тесты, которые можно привязать к этому документу вместо создания нового
-            // (свои у другого документа — тоже показываем, чтобы можно было перепривязать).
-            'availableTests' => $document->test ? [] : Test::with('document:id,title,description')
+            // Свободные тесты (без документа), которые можно привязать вместо создания нового.
+            'availableTests' => $document->test ? [] : Test::whereNull('document_id')
                 ->orderBy('title')
-                ->get(['id', 'title', 'document_id'])
-                ->map(fn($t) => [
-                    'id'              => $t->id,
-                    'title'           => $t->title,
-                    'document_title'  => $t->document?->display_name,
-                ])
+                ->get(['id', 'title'])
                 ->values(),
             'materials' => (config('features.induction') && $document->isConfirmationMode())
                 ? $document->materials->map(fn($m) => [

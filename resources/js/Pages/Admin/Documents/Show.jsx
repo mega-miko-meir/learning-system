@@ -169,7 +169,6 @@ export default function DocumentShow({ document: doc, test, materials = [], avai
                                             {availableTests.map((t) => (
                                                 <option key={t.id} value={t.id}>
                                                     {t.title}
-                                                    {t.document_title ? ` (сейчас: ${t.document_title})` : ""}
                                                 </option>
                                             ))}
                                         </select>
