@@ -34,6 +34,7 @@ class MatrixController extends Controller
                 'training_type' => $m->training_type,
                 'is_mandatory' => $m->is_mandatory,
                 'required_reading_minutes' => $m->required_reading_minutes,
+                'created_at' => $m->created_at?->format('d.m.Y H:i'),
             ]);
 
         $departments = Department::active()->orderBy('name')->get(['id', 'name']);

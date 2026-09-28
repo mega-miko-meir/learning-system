@@ -508,6 +508,7 @@ export default function MatrixIndex({ matrix, positions, documents, departments 
                                             <th className="text-left px-4 py-2 font-medium text-gray-500">Вид</th>
                                             <th className="text-left px-4 py-2 font-medium text-gray-500">Время</th>
                                             <th className="text-center px-4 py-2 font-medium text-gray-500">Обяз.</th>
+                                            <th className="text-left px-4 py-2 font-medium text-gray-500">Дата создания</th>
                                             <th className="px-4 py-2" />
                                         </tr>
                                     </thead>
@@ -532,6 +533,7 @@ export default function MatrixIndex({ matrix, positions, documents, departments 
                                                         ? <span className="text-green-600 text-xs">✓</span>
                                                         : <span className="text-gray-300 text-xs">—</span>}
                                                 </td>
+                                                <td className="px-4 py-2.5 text-xs text-gray-400 whitespace-nowrap">{m.created_at}</td>
                                                 <td className="px-4 py-2.5 text-right">
                                                     <div className="flex items-center justify-end gap-3">
                                                         <button onClick={() => setEditItem(m)}
