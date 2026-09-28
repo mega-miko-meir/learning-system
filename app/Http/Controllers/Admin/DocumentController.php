@@ -73,6 +73,16 @@ class DocumentController extends Controller
             'matrix_reading_minutes'  => ['nullable', 'integer', 'in:5,10,15,20,30,45,60'],
         ]);
 
+        $data['title'] = trim($data['title']);
+
+        $duplicate = Document::where('title', $data['title'])->first();
+        if ($duplicate) {
+            return back()->withErrors([
+                'title' => "Документ с кодом «{$data['title']}» уже есть в системе: «{$duplicate->display_name}»"
+                    . ($duplicate->is_active ? '' : ' (неактивен)') . '. Откройте его вместо создания нового.',
+            ])->withInput();
+        }
+
         $path = $request->file('file')->store('documents', 'public');
         $this->compressPdf($path);
 
@@ -194,6 +204,16 @@ class DocumentController extends Controller
             'is_active'   => ['boolean'],
             'completion_mode' => ['nullable', 'in:test,confirmation'],
         ]);
+
+        $data['title'] = trim($data['title']);
+
+        $duplicate = Document::where('title', $data['title'])->where('id', '!=', $document->id)->first();
+        if ($duplicate) {
+            return back()->withErrors([
+                'title' => "Документ с кодом «{$data['title']}» уже есть в системе: «{$duplicate->display_name}»"
+                    . ($duplicate->is_active ? '' : ' (неактивен)') . '.',
+            ])->withInput();
+        }
 
         // Функция выключена — режим документа не меняем (сохраняем как есть).
         if (!config('features.induction')) {
