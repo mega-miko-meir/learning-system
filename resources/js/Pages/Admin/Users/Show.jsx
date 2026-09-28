@@ -82,19 +82,15 @@ function TempPasswordModal({ title, password, employee, onClose }) {
 }
 
 function DeleteEmployeeModal({ employee, onClose }) {
-    const [confirmName, setConfirmName] = useState("");
-    const [processing, setProcessing]   = useState(false);
-    const [error, setError]             = useState(null);
-
-    const matches = confirmName.trim() === employee.full_name;
+    const [processing, setProcessing] = useState(false);
+    const [error, setError]           = useState(null);
 
     function submit(e) {
         e.preventDefault();
         setProcessing(true);
         setError(null);
         router.delete(route("admin.users.destroy", employee.id), {
-            data: { confirm_name: confirmName },
-            onError: (errs) => setError(errs.confirm_name ?? "Не удалось удалить."),
+            onError: () => setError("Не удалось удалить."),
             onFinish: () => setProcessing(false),
         });
     }
@@ -108,20 +104,11 @@ function DeleteEmployeeModal({ employee, onClose }) {
                     подчинённых и он не руководит отделом — иначе сервер откажет и объяснит причину.
                 </p>
                 <form onSubmit={submit}>
-                    <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                        Введите «{employee.full_name}», чтобы подтвердить
-                    </label>
-                    <input
-                        autoFocus
-                        value={confirmName}
-                        onChange={(e) => setConfirmName(e.target.value)}
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg mb-1 focus:outline-none focus:ring-2 focus:ring-red-500"
-                    />
                     {error && <p className="text-xs text-red-600 mb-3">{error}</p>}
-                    <div className="flex gap-2 mt-4">
+                    <div className="flex gap-2">
                         <button
                             type="submit"
-                            disabled={!matches || processing}
+                            disabled={processing}
                             className="flex-1 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                             {processing ? "Удаляем..." : "Удалить навсегда"}

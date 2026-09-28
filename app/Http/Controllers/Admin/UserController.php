@@ -450,14 +450,6 @@ class UserController extends Controller
     {
         abort_if(!in_array($user->role, ['employee', 'hr_admin', 'manager']), 403);
 
-        $data = $request->validate([
-            'confirm_name' => ['required', 'string'],
-        ]);
-
-        if (trim($data['confirm_name']) !== $user->full_name) {
-            return back()->withErrors(['confirm_name' => 'Введённое ФИО не совпадает. Удаление отменено.']);
-        }
-
         if ($user->is_active) {
             return back()->with('error', 'Сначала деактивируйте сотрудника — удалить можно только деактивированного.');
         }
