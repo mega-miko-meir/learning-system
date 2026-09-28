@@ -443,6 +443,65 @@ class UserController extends Controller
         return back()->with('success', "Сотрудник {$user->short_name} активирован.");
     }
 
+    // Окончательное удаление — только для деактивированных сотрудников без истории обучения
+    // и без действующих организационных связей (руководство отделом / подчинённые).
+    // Ограничено ролями employee/hr_admin/manager — админов и супер-админов отсюда не удалить.
+    public function destroy(Request $request, User $user)
+    {
+        abort_if(!in_array($user->role, ['employee', 'hr_admin', 'manager']), 403);
+
+        $data = $request->validate([
+            'confirm_name' => ['required', 'string'],
+        ]);
+
+        if (trim($data['confirm_name']) !== $user->full_name) {
+            return back()->withErrors(['confirm_name' => 'Введённое ФИО не совпадает. Удаление отменено.']);
+        }
+
+        if ($user->is_active) {
+            return back()->with('error', 'Сначала деактивируйте сотрудника — удалить можно только деактивированного.');
+        }
+
+        $blockers = [];
+
+        $assignmentsCount = TrainingAssignment::where('user_id', $user->id)->count();
+        if ($assignmentsCount > 0) {
+            $blockers[] = "есть история обучения ({$assignmentsCount})";
+        }
+
+        $subordinatesCount = User::where('manager_id', $user->id)->count();
+        if ($subordinatesCount > 0) {
+            $blockers[] = "есть подчинённые ({$subordinatesCount})";
+        }
+
+        $managedDept = Department::where('manager_id', $user->id)->first();
+        if ($managedDept) {
+            $blockers[] = "руководит отделом «{$managedDept->name}»";
+        }
+
+        if (!empty($blockers)) {
+            return back()->with('error', 'Нельзя удалить сотрудника: ' . implode(', ', $blockers) . '.');
+        }
+
+        $name = $user->full_name;
+
+        // Пишем в аудит до удаления — иначе user_id в этой же записи обнулился бы (nullOnDelete).
+        AuditLog::create([
+            'user_id'     => auth()->id(),
+            'user_name'   => auth()->user()->full_name,
+            'action'      => 'delete_permanent',
+            'model_type'  => 'User',
+            'model_id'    => $user->id,
+            'ip_address'  => $request->ip(),
+            'description' => "Окончательно удалён сотрудник: {$name}",
+            'created_at'  => now(),
+        ]);
+
+        $user->delete();
+
+        return redirect()->route('admin.users.index')->with('success', "Сотрудник «{$name}» удалён навсегда.");
+    }
+
     public function resetPassword(Request $request, User $user)
     {
         $tempPassword = 'Temp' . rand(1000, 9999) . '!';

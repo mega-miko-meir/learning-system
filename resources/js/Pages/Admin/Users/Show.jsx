@@ -81,6 +81,65 @@ function TempPasswordModal({ title, password, employee, onClose }) {
     );
 }
 
+function DeleteEmployeeModal({ employee, onClose }) {
+    const [confirmName, setConfirmName] = useState("");
+    const [processing, setProcessing]   = useState(false);
+    const [error, setError]             = useState(null);
+
+    const matches = confirmName.trim() === employee.full_name;
+
+    function submit(e) {
+        e.preventDefault();
+        setProcessing(true);
+        setError(null);
+        router.delete(route("admin.users.destroy", employee.id), {
+            data: { confirm_name: confirmName },
+            onError: (errs) => setError(errs.confirm_name ?? "Не удалось удалить."),
+            onFinish: () => setProcessing(false),
+        });
+    }
+
+    return (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-sm mx-4 shadow-xl">
+                <h3 className="text-base font-semibold text-red-700 mb-1">Удалить сотрудника навсегда?</h3>
+                <p className="text-sm text-gray-500 mb-4">
+                    Это действие необратимо. Доступно только если у сотрудника нет истории обучения,
+                    подчинённых и он не руководит отделом — иначе сервер откажет и объяснит причину.
+                </p>
+                <form onSubmit={submit}>
+                    <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                        Введите «{employee.full_name}», чтобы подтвердить
+                    </label>
+                    <input
+                        autoFocus
+                        value={confirmName}
+                        onChange={(e) => setConfirmName(e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg mb-1 focus:outline-none focus:ring-2 focus:ring-red-500"
+                    />
+                    {error && <p className="text-xs text-red-600 mb-3">{error}</p>}
+                    <div className="flex gap-2 mt-4">
+                        <button
+                            type="submit"
+                            disabled={!matches || processing}
+                            className="flex-1 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                            {processing ? "Удаляем..." : "Удалить навсегда"}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="flex-1 px-4 py-2 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50"
+                        >
+                            Отмена
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
 function ResetPasswordModal({ employee, onConfirm, onClose }) {
     const [mustChange, setMustChange] = useState(true);
     const [sendEmail, setSendEmail]   = useState(true);
@@ -185,6 +244,7 @@ export default function UserShow({ employee, assignments, documents }) {
     const [showPasswordModal, setShowPasswordModal]   = useState(false);
     const [showResetModal, setShowResetModal]          = useState(false);
     const [showAssignModal, setShowAssignModal]        = useState(false);
+    const [showDeleteModal, setShowDeleteModal]        = useState(false);
     const [passwordModalTitle, setPasswordModalTitle] = useState("");
     const [openAttempts, setOpenAttempts]             = useState({});
 
@@ -253,6 +313,10 @@ export default function UserShow({ employee, assignments, documents }) {
                     routeName="admin.users.assignments.store"
                     onClose={() => setShowAssignModal(false)}
                 />
+            )}
+
+            {showDeleteModal && (
+                <DeleteEmployeeModal employee={employee} onClose={() => setShowDeleteModal(false)} />
             )}
 
             <div className="flex items-center justify-between mb-6">
@@ -325,6 +389,19 @@ export default function UserShow({ employee, assignments, documents }) {
                                 >
                                     Активировать
                                 </button>
+                            )}
+                            {!employee.is_active && ["employee", "hr_admin", "manager"].includes(employee.role) && (
+                                <div className="pt-2 mt-2 border-t border-gray-50">
+                                    <button
+                                        onClick={() => setShowDeleteModal(true)}
+                                        className="block w-full text-center px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
+                                    >
+                                        Удалить навсегда
+                                    </button>
+                                    <p className="text-[11px] text-gray-400 mt-1.5 text-center">
+                                        Необратимо. Доступно, только если нет истории обучения, подчинённых и руководства отделом.
+                                    </p>
+                                </div>
                             )}
                         </div>
                     </div>
