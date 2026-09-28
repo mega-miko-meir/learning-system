@@ -1,7 +1,6 @@
 import { Head, router } from "@inertiajs/react";
 import { useState, useMemo } from "react";
 import AppLayout from "../../../Layouts/AppLayout";
-import SearchableSelect from "../../../Components/SearchableSelect";
 
 const TRAINING_TYPES = [
     { value: "primary",   label: "Первичное" },
@@ -430,6 +429,7 @@ function AddForm({ positions, documents, departments }) {
 }
 
 export default function MatrixIndex({ matrix, positions, documents, departments }) {
+    const [search,     setSearch]     = useState("");
     const [filterDept, setFilterDept] = useState("");
     const [filterPos,  setFilterPos]  = useState("");
     const [editItem,   setEditItem]   = useState(null);
@@ -450,11 +450,14 @@ export default function MatrixIndex({ matrix, positions, documents, departments 
         [filterDept, positions]
     );
 
+    const q = search.trim().toLowerCase();
+
     const filtered = useMemo(() => matrix.filter((m) => {
         if (filterDept && m.department_id !== Number(filterDept)) return false;
         if (filterPos  && m.position_id  !== Number(filterPos))  return false;
+        if (q && ![m.position, m.document, m.document_code, m.department].some((v) => v?.toLowerCase().includes(q))) return false;
         return true;
-    }), [matrix, filterDept, filterPos]);
+    }), [matrix, filterDept, filterPos, q]);
 
     const grouped = filtered.reduce((acc, m) => {
         const key = m.department ?? "Без отдела";
@@ -483,23 +486,49 @@ export default function MatrixIndex({ matrix, positions, documents, departments 
                             }
                         </p>
                         <ApplyMatrixButton />
-                        <div className="ml-auto flex gap-2">
-                            <SearchableSelect
-                                className="w-44"
+                        <div className="ml-auto flex flex-wrap items-center gap-2">
+                            {/* Поиск — фронтенд, как на страницах «Документы» и «Сотрудники» */}
+                            <div className="relative">
+                                <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none"
+                                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                        d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+                                </svg>
+                                <input
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    placeholder="Поиск по должности, документу..."
+                                    className="pl-8 pr-7 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-56"
+                                />
+                                {search && (
+                                    <button onClick={() => setSearch("")}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                                        ×
+                                    </button>
+                                )}
+                            </div>
+
+                            <select
                                 value={filterDept}
-                                onChange={handleFilterDeptChange}
-                                options={departments.map((d) => ({ value: String(d.id), label: d.name }))}
-                                placeholder="Все отделы"
-                                searchPlaceholder="Поиск отдела..."
-                            />
-                            <SearchableSelect
-                                className="w-44"
+                                onChange={(e) => handleFilterDeptChange(e.target.value)}
+                                className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="">Все отделы</option>
+                                {departments.map((d) => (
+                                    <option key={d.id} value={d.id}>{d.name}</option>
+                                ))}
+                            </select>
+
+                            <select
                                 value={filterPos}
-                                onChange={(v) => setFilterPos(v ? Number(v) : "")}
-                                options={filteredPositionsForFilter.map((p) => ({ value: String(p.id), label: p.name }))}
-                                placeholder="Все должности"
-                                searchPlaceholder="Поиск должности..."
-                            />
+                                onChange={(e) => setFilterPos(e.target.value ? Number(e.target.value) : "")}
+                                className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="">Все должности</option>
+                                {filteredPositionsForFilter.map((p) => (
+                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                ))}
+                            </select>
                         </div>
                     </div>
 
