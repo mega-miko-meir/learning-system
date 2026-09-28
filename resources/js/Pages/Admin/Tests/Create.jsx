@@ -441,7 +441,7 @@ export default function TestCreate({ documents, document_id, test }) {
                             <input
                                 ref={fileInputRef}
                                 type="file"
-                                accept=".pdf"
+                                accept=".pdf,.docx"
                                 className="hidden"
                                 onChange={handleImport}
                             />
@@ -449,13 +449,13 @@ export default function TestCreate({ documents, document_id, test }) {
                                 type="button"
                                 onClick={() => fileInputRef.current.click()}
                                 disabled={importing}
-                                title="Импортировать вопросы из PDF-файла"
+                                title="Импортировать вопросы из файла PDF или Word (.docx)"
                                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 disabled:opacity-50 transition-colors"
                             >
                                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                                 </svg>
-                                {importing ? 'Загрузка...' : 'Импорт из PDF'}
+                                {importing ? 'Загрузка...' : 'Импорт из PDF/Word'}
                             </button>
                         </div>
                     </div>
@@ -474,7 +474,7 @@ export default function TestCreate({ documents, document_id, test }) {
                             <svg className="w-3 h-3 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                             </svg>
-                            Формат PDF-шаблона
+                            Формат шаблона (PDF или Word)
                         </summary>
                         <pre className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600 overflow-x-auto leading-relaxed">{`Название теста
 

@@ -213,13 +213,25 @@ class TestController extends Controller
     public function parsePdf(Request $request): \Illuminate\Http\JsonResponse
     {
         $request->validate([
-            'file' => ['required', 'file', 'mimes:pdf', 'max:10240'],
+            'file' => ['required', 'file', 'max:10240'],
         ]);
 
+        $file      = $request->file('file');
+        $extension = strtolower($file->getClientOriginalExtension());
+
+        // Проверяем по расширению, а не по mimes:pdf,docx — у .docx нет уникальной MIME-сигнатуры
+        // (это ZIP-архив), и finfo нередко определяет реальные .docx как обычный application/zip,
+        // что ложно отклоняло бы корректные файлы.
+        if (!in_array($extension, ['pdf', 'docx'], true)) {
+            return response()->json([
+                'error' => 'Поддерживаются только файлы PDF и Word (.docx).',
+            ], 422);
+        }
+
         try {
-            $parser = new \Smalot\PdfParser\Parser();
-            $pdf    = $parser->parseFile($request->file('file')->getPathname());
-            $text   = str_replace(["\r\n", "\r"], "\n", $pdf->getText());
+            $text = $extension === 'docx'
+                ? $this->extractDocxText($file->getPathname())
+                : $this->extractPdfText($file->getPathname());
 
             $lines     = array_values(array_filter(array_map('trim', explode("\n", $text))));
             $title     = '';
@@ -231,7 +243,7 @@ class TestController extends Controller
             }
 
             $body      = implode("\n", array_slice($lines, $bodyStart));
-            $questions = $this->parsePdfText($body);
+            $questions = $this->parseQuestionsFromText($body);
 
             if (empty($questions)) {
                 return response()->json([
@@ -243,12 +255,45 @@ class TestController extends Controller
 
         } catch (\Exception $e) {
             return response()->json([
-                'error' => 'Не удалось прочитать PDF: ' . $e->getMessage(),
+                'error' => 'Не удалось прочитать файл: ' . $e->getMessage(),
             ], 422);
         }
     }
 
-    private function parsePdfText(string $text): array
+    private function extractPdfText(string $path): string
+    {
+        $parser = new \Smalot\PdfParser\Parser();
+        $pdf    = $parser->parseFile($path);
+
+        return str_replace(["\r\n", "\r"], "\n", $pdf->getText());
+    }
+
+    // .docx — это ZIP-архив; текст лежит в word/document.xml как <w:t>...</w:t> внутри <w:p>-параграфов.
+    // Полноценный парсер (phpoffice/phpword) избыточен — нам нужен только простой текст для шаблона.
+    private function extractDocxText(string $path): string
+    {
+        $zip = new \ZipArchive();
+        if ($zip->open($path) !== true) {
+            throw new \RuntimeException('не удалось открыть файл как .docx');
+        }
+
+        $xml = $zip->getFromName('word/document.xml');
+        $zip->close();
+
+        if ($xml === false) {
+            throw new \RuntimeException('файл повреждён или это не .docx');
+        }
+
+        // Конец параграфа/разрыв строки → перевод строки, чтобы разбиение по вопросам работало как в PDF.
+        $xml  = preg_replace('/<\/w:p>/', "\n", $xml);
+        $xml  = preg_replace('/<w:br\s*\/?>/', "\n", $xml);
+        $xml  = preg_replace('/<w:tab\s*\/?>/', "\t", $xml);
+        $text = strip_tags($xml);
+
+        return html_entity_decode($text, ENT_QUOTES | ENT_XML1, 'UTF-8');
+    }
+
+    private function parseQuestionsFromText(string $text): array
     {
         $blocks = preg_split('/(?=^\d+\.)/m', $text);
 
