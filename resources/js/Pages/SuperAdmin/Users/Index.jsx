@@ -1,4 +1,4 @@
-import { Head, Link, router, useForm } from "@inertiajs/react";
+import { Head, Link, router } from "@inertiajs/react";
 import { useState } from "react";
 import AppLayout from "../../../Layouts/AppLayout";
 import Pagination from "../../../Components/Pagination";
@@ -12,15 +12,16 @@ const ROLES = [
 ];
 
 function RoleSelector({ user }) {
-    const { data, setData, post, processing } = useForm({ role: user.role });
-    const [open, setOpen] = useState(false);
+    const [open, setOpen]             = useState(false);
+    const [processing, setProcessing] = useState(false);
 
     function changeRole(newRole) {
-        setData("role", newRole);
         setOpen(false);
-        post(route("superadmin.users.role", user.id), {
-            data: { role: newRole },
+        if (newRole === user.role) return;
+        setProcessing(true);
+        router.post(route("superadmin.users.role", user.id), { role: newRole }, {
             preserveScroll: true,
+            onFinish: () => setProcessing(false),
         });
     }
 
@@ -28,7 +29,7 @@ function RoleSelector({ user }) {
         router.post(route("superadmin.users.toggle", user.id), {}, { preserveScroll: true });
     }
 
-    const currentRole = ROLES.find((r) => r.value === data.role);
+    const currentRole = ROLES.find((r) => r.value === user.role);
 
     return (
         <div className="flex items-center gap-2">
@@ -38,7 +39,7 @@ function RoleSelector({ user }) {
                     disabled={processing}
                     className={`text-xs px-2.5 py-1 rounded-full border cursor-pointer hover:opacity-80 transition-opacity ${currentRole?.cls ?? "bg-gray-50 text-gray-600 border-gray-200"}`}
                 >
-                    {currentRole?.label ?? data.role} ▾
+                    {currentRole?.label ?? user.role} ▾
                 </button>
                 {open && (
                     <div className="absolute z-20 top-7 left-0 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden w-52">
@@ -46,7 +47,7 @@ function RoleSelector({ user }) {
                             <button
                                 key={r.value}
                                 onClick={() => changeRole(r.value)}
-                                className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 ${r.value === data.role ? "font-bold" : ""}`}
+                                className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 ${r.value === user.role ? "font-bold" : ""}`}
                             >
                                 <span className={`inline-block w-2 h-2 rounded-full ${r.cls.split(" ")[0]}`} />
                                 {r.label}
