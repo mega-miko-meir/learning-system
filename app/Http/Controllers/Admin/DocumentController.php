@@ -26,20 +26,21 @@ class DocumentController extends Controller
                 )
             )
             ->when($request->no_test, fn($q) =>
-                $q->whereDoesntHave('test')
+                $q->whereDoesntHave('test')->where('completion_mode', '!=', 'confirmation')
             )
             ->latest()
             ->paginate(20)
             ->withQueryString()
             ->through(fn($d) => [
-                'id'          => $d->id,
-                'title'       => $d->title,
-                'description' => $d->description,
-                'type'        => $d->type,
-                'version'     => $d->version,
-                'is_active'   => $d->is_active,
-                'has_test'    => $d->test_exists,
-                'created_at'  => $d->created_at->format('d.m.Y'),
+                'id'               => $d->id,
+                'title'            => $d->title,
+                'description'      => $d->description,
+                'type'             => $d->type,
+                'version'          => $d->version,
+                'is_active'        => $d->is_active,
+                'has_test'         => $d->test_exists,
+                'no_test_required' => $d->completion_mode === 'confirmation',
+                'created_at'       => $d->created_at->format('d.m.Y'),
             ]);
 
         return Inertia::render('Admin/Documents/Index', compact('documents'));
