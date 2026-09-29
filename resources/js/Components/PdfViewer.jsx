@@ -6,19 +6,25 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
     import.meta.url
 ).href;
 
+// pdf.js декодирует некоторые форматы вложенных изображений (JBIG2 — им часто сжимают
+// сканы печатей/подписей, а также OpenJPEG/JPX) через отдельные модули, которые НЕ
+// подтягиваются автоматически при сборке через Vite. Без этого JBIG2-картинки не декодируются
+// и рендерятся блочным «мусором» вместо реального содержимого — воспроизведено и подтверждено
+// локальным рендером через pdf.js на реальном документе (растягивание/масштаб тут ни при чём,
+// баг был именно в отсутствии этих файлов). useWasm:false — намеренно используем чистый
+// JS-декодер, а не WASM: он не требует от веб-сервера отдавать .wasm с правильным Content-Type
+// (частая причина тихих поломок на проде) и при проверке сработал надёжно. Сами файлы лежат в
+// public/vendor/pdfjs-wasm/ (скопированы из node_modules/pdfjs-dist/wasm).
+const PDFJS_WASM_URL = new URL("/vendor/pdfjs-wasm/", window.location.origin).href;
+
 // Раньше ширина страницы на экране считалась как % от ширины контейнера (который часто шире,
 // чем реальное разрешение отрендеренной картинки) — из-за этого страница растягивалась сверх
-// своего фактического разрешения и получалась размытой/блочной независимо от того, насколько
-// детально её отрендерил pdf.js. Теперь 100% зума = ровно BASE_DISPLAY_WIDTH CSS-пикселей вне
-// зависимости от ширины контейнера, а растеризация делается с запасом (BASE_DISPLAY_WIDTH ×
-// devicePixelRatio экрана), поэтому картинка на экране никогда не увеличивается сверх своего
-// реального разрешения — только уменьшается (что всегда чётко) при узком экране/при зуме < 100%.
+// своего фактического разрешения и получалась размытой при зуме > фактического разрешения.
+// Теперь 100% зума = ровно BASE_DISPLAY_WIDTH CSS-пикселей вне зависимости от ширины контейнера,
+// а растеризация делается с запасом на devicePixelRatio экрана, поэтому картинка на экране
+// никогда не увеличивается сверх своего реального разрешения.
 const BASE_DISPLAY_WIDTH = 850; // ширина страницы в CSS-пикселях при 100% — как одна страница A4/Letter на экране
-const MAX_DEVICE_SCALE   = 1.5; // ограничение сверху — вместе с SUPERSAMPLE иначе страницы станут слишком тяжёлыми
-// Рендерим страницу в 2 раза крупнее, чем нужно для показа, и отдаём финальное уменьшение браузеру
-// (через CSS-ширину <img>) — сглаживает блочность JPEG-сжатия вложенных сканов (штампы, подписи),
-// которую даёт собственное уменьшение изображений внутри pdf.js при рендере в canvas.
-const SUPERSAMPLE = 2;
+const MAX_DEVICE_SCALE   = 2;   // ограничение сверху — иначе на 200%+ экранах страницы станут слишком тяжёлыми
 const DEFAULT_ZOOM = 100;
 
 export default function PdfViewer({ url }) {
@@ -49,7 +55,7 @@ export default function PdfViewer({ url }) {
                 const { data } = await window.axios.get(url, { responseType: "arraybuffer" });
                 if (cancelRef.current) return;
 
-                const pdf = await pdfjsLib.getDocument({ data }).promise;
+                const pdf = await pdfjsLib.getDocument({ data, wasmUrl: PDFJS_WASM_URL, useWasm: false }).promise;
                 if (cancelRef.current) return;
 
                 setTotal(pdf.numPages);
@@ -63,14 +69,9 @@ export default function PdfViewer({ url }) {
                     const page = await pdf.getPage(n);
 
                     // Масштаб подбирается так, чтобы BASE_DISPLAY_WIDTH CSS-пикселей (размер
-                    // страницы при 100% зума) совпал с devicePixelRatio физических пикселей,
-                    // умноженный на SUPERSAMPLE: рендерим с запасом по разрешению и отдаём
-                    // финальное уменьшение браузеру (через CSS-ширину <img>) — у него сглаживание
-                    // при уменьшении обычно заметно лучше, чем у внутреннего масштабирования
-                    // вложенных растровых изображений (сканы штампов/подписей) в самом pdf.js —
-                    // без запаса на них были видны блоки JPEG-сжатия.
+                    // страницы при 100% зума) точно совпал с devicePixelRatio физических пикселей.
                     const nativeWidth = page.getViewport({ scale: 1 }).width; // ширина страницы в pt PDF
-                    const renderScale = (BASE_DISPLAY_WIDTH / nativeWidth) * dpr * SUPERSAMPLE;
+                    const renderScale = (BASE_DISPLAY_WIDTH / nativeWidth) * dpr;
                     const viewport    = page.getViewport({ scale: renderScale });
 
                     canvas.width  = viewport.width;
@@ -84,7 +85,7 @@ export default function PdfViewer({ url }) {
 
                     collected.push({
                         src:   canvas.toDataURL("image/png"),
-                        width: viewport.width / (dpr * SUPERSAMPLE), // CSS-ширина страницы при zoom = 100%
+                        width: viewport.width / dpr, // CSS-ширина страницы при zoom = 100%
                     });
                     setPages([...collected]);
                 }
