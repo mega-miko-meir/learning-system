@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exports\DocumentsExport;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Document;
@@ -13,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
+use Maatwebsite\Excel\Facades\Excel;
 
 class DocumentController extends Controller
 {
@@ -48,6 +50,18 @@ class DocumentController extends Controller
             ]);
 
         return Inertia::render('Admin/Documents/Index', compact('documents'));
+    }
+
+    public function export(Request $request)
+    {
+        $export = new DocumentsExport(
+            search: $request->input('search') ?: null,
+            noTestOnly: $request->boolean('no_test'),
+        );
+
+        $filename = 'documents_'.now()->format('Ymd_His').'.xlsx';
+
+        return Excel::download($export, $filename);
     }
 
     public function create()

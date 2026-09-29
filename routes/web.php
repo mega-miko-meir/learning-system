@@ -89,6 +89,7 @@ Route::middleware(['auth', 'user.active'])->group(function () {
         Route::post('/users/{user}/assign-training', [\App\Http\Controllers\Admin\UserController::class, 'assignTraining'])->name('users.assign-training');
 
         // Документы
+        Route::get('/documents/export', [\App\Http\Controllers\Admin\DocumentController::class, 'export'])->name('documents.export');
         Route::resource('documents', \App\Http\Controllers\Admin\DocumentController::class);
         Route::post('/documents/{document}/new-version', [\App\Http\Controllers\Admin\DocumentController::class, 'uploadNewVersion'])->name('documents.new-version');
         Route::post('/documents/{document}/attach-test', [\App\Http\Controllers\Admin\DocumentController::class, 'attachTest'])->name('documents.attach-test');
