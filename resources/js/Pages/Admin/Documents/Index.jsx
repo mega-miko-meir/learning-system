@@ -1,5 +1,5 @@
 import { Head, Link, router } from "@inertiajs/react";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import AppLayout from "../../../Layouts/AppLayout";
 import Pagination from "../../../Components/Pagination";
 
@@ -15,35 +15,24 @@ function SortIcon({ direction }) {
 }
 
 const SORTABLE_COLUMNS = {
-    type:        { label: "Тип",      get: (d) => d.type },
-    title:       { label: "Код",      get: (d) => d.title },
-    description: { label: "Название", get: (d) => d.description },
-    created_at:  { label: "Добавлен", get: (d) => d.created_at_ts },
+    type:        { label: "Тип" },
+    title:       { label: "Код" },
+    description: { label: "Название" },
+    created_at:  { label: "Добавлен" },
 };
 
 export default function DocumentsIndex({ documents }) {
     const params = Object.fromEntries(new URLSearchParams(window.location.search));
     const [search, setSearch] = useState(params.search ?? "");
-    const [sort, setSort] = useState({ key: null, dir: "asc" });
 
+    // Сортировка серверная (по всем документам, не только по текущей странице), но без
+    // перезагрузки страницы — обычный Inertia-запрос с сохранением состояния.
     function toggleSort(key) {
-        setSort((prev) => prev.key === key
-            ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
-            : { key, dir: "asc" }
-        );
-    }
-
-    const sortedDocuments = useMemo(() => {
-        if (!sort.key) return documents.data;
-        const { get } = SORTABLE_COLUMNS[sort.key];
-        const dir = sort.dir === "asc" ? 1 : -1;
-        return [...documents.data].sort((a, b) => {
-            const av = get(a);
-            const bv = get(b);
-            if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
-            return String(av).localeCompare(String(bv), "ru") * dir;
+        const dir = params.sort === key && params.dir === "asc" ? "desc" : "asc";
+        router.get(route("admin.documents.index"), { ...params, sort: key, dir }, {
+            preserveState: true, replace: true,
         });
-    }, [documents.data, sort]);
+    }
 
     function doSearch(e) {
         e.preventDefault();
@@ -115,7 +104,7 @@ export default function DocumentsIndex({ documents }) {
                                         className="flex items-center gap-1 hover:text-gray-900"
                                     >
                                         {label}
-                                        <SortIcon direction={sort.key === key ? sort.dir : null} />
+                                        <SortIcon direction={params.sort === key ? (params.dir === "desc" ? "desc" : "asc") : null} />
                                     </button>
                                 </th>
                             ))}
@@ -126,14 +115,14 @@ export default function DocumentsIndex({ documents }) {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                        {sortedDocuments.length === 0 ? (
+                        {documents.data.length === 0 ? (
                             <tr>
                                 <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
                                     Документов нет
                                 </td>
                             </tr>
                         ) : (
-                            sortedDocuments.map((d) => (
+                            documents.data.map((d) => (
                                 <tr key={d.id} className={`hover:bg-gray-50 ${!d.has_test && !d.no_test_required ? "bg-orange-50/40" : ""}`}>
                                     <td className="px-4 py-3 text-gray-500">{d.type}</td>
                                     <td className="px-4 py-3 text-gray-500">{d.title}</td>

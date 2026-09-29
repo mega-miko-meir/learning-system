@@ -18,6 +18,10 @@ class DocumentController extends Controller
 {
     public function index(Request $request)
     {
+        $sortable = ['type' => 'type', 'title' => 'title', 'description' => 'description', 'created_at' => 'created_at'];
+        $sortColumn = $sortable[$request->sort] ?? null;
+        $sortDir = $request->dir === 'desc' ? 'desc' : 'asc';
+
         $documents = Document::withExists('test')
             ->when($request->search, fn($q, $s) =>
                 $q->where(fn($q) =>
@@ -28,7 +32,7 @@ class DocumentController extends Controller
             ->when($request->no_test, fn($q) =>
                 $q->whereDoesntHave('test')->where('completion_mode', '!=', 'confirmation')
             )
-            ->latest()
+            ->when($sortColumn, fn($q) => $q->orderBy($sortColumn, $sortDir), fn($q) => $q->latest())
             ->paginate(20)
             ->withQueryString()
             ->through(fn($d) => [
@@ -41,7 +45,6 @@ class DocumentController extends Controller
                 'has_test'         => $d->test_exists,
                 'no_test_required' => $d->completion_mode === 'confirmation',
                 'created_at'       => $d->created_at->format('d.m.Y'),
-                'created_at_ts'    => $d->created_at->timestamp,
             ]);
 
         return Inertia::render('Admin/Documents/Index', compact('documents'));
