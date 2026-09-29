@@ -83,14 +83,17 @@ export default function InductionMaterials({ document: doc, materials }) {
 
     return (
         <div className="bg-white rounded-xl border border-gray-100 p-5">
-            <h2 className="text-sm font-semibold text-gray-700 mb-1">Материалы обучения</h2>
+            <h2 className="text-sm font-semibold text-gray-700 mb-1">Материалы обучения (необязательно)</h2>
             <p className="text-xs text-gray-400 mb-3">
-                Обучение без теста: сотрудник смотрит видео (засчитывается от 90%) и подтверждает ознакомление —
-                после этого статус ставится автоматически.
+                Тест для этого документа не требуется: сотруднику достаточно изучить сам документ и подтвердить
+                ознакомление. Видео и пункты устного инструктажа ниже — по желанию, как дополнение к документу;
+                если они не нужны, этот блок можно оставить пустым.
             </p>
 
             {materials.length === 0 ? (
-                <p className="text-xs text-orange-600 bg-orange-50 rounded-lg px-3 py-2 mb-3">Материалы не добавлены</p>
+                <p className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2 mb-3">
+                    Дополнительные материалы не добавлены — это нормально, если самого документа достаточно.
+                </p>
             ) : (
                 <ul className="space-y-2 mb-4">
                     {materials.map((m) => (

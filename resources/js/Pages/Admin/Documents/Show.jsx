@@ -94,7 +94,7 @@ export default function DocumentShow({ document: doc, test, materials = [], avai
                                 <div>
                                     <dt className="text-gray-400 text-xs">Способ завершения</dt>
                                     <dd className="text-gray-700">
-                                        {isConfirmation ? "Отметка без теста (видео + ознакомление)" : "Чтение и тест"}
+                                        {isConfirmation ? "Без теста (ознакомление)" : "Чтение и тест"}
                                     </dd>
                                 </div>
                             )}

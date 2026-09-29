@@ -129,6 +129,8 @@ export default function Induction({ assignment, materials, videos_done, threshol
 
     const isCompleted = assignment.status === "completed";
     const isReadOnly  = !["pending", "in_progress"].includes(assignment.status);
+    const hasVideo    = materials.some((m) => m.kind === "video");
+    const hasOral     = materials.some((m) => m.kind === "text");
 
     function refreshState() {
         router.reload({ only: ["assignment", "materials", "videos_done"] });
@@ -170,15 +172,18 @@ export default function Induction({ assignment, materials, videos_done, threshol
                         </a>
                     </div>
                     <p className="text-xs text-gray-500 mt-3">
-                        Ознакомьтесь с документом, пройдите устный инструктаж и просмотрите видеоролики до конца
-                        (засчитывается не менее {threshold_percent}% длительности). Тест сдавать не нужно —
-                        после просмотра и подтверждения ознакомления инструктаж отмечается пройденным автоматически.
+                        Ознакомьтесь с документом
+                        {hasOral && ", пройдите устный инструктаж"}
+                        {hasVideo && ` и просмотрите видеоролики до конца (засчитывается не менее ${threshold_percent}% длительности)`}.
+                        {" "}Тест сдавать не нужно — после {hasVideo || hasOral ? "этого" : "изучения документа"} и
+                        подтверждения ознакомления обучение отмечается пройденным автоматически.
                     </p>
                 </div>
 
                 {materials.length === 0 && (
-                    <div className="bg-white rounded-xl border border-gray-100 p-5 text-sm text-gray-400">
-                        Материалы ещё не добавлены. Обратитесь к администратору.
+                    <div className="bg-white rounded-xl border border-gray-100 p-5 text-sm text-gray-500">
+                        Дополнительных материалов к этому документу нет — изучите сам документ и подтвердите
+                        ознакомление ниже.
                     </div>
                 )}
 
@@ -217,7 +222,9 @@ export default function Induction({ assignment, materials, videos_done, threshol
                                 onChange={(e) => setConfirmed(e.target.checked)}
                                 className="mt-0.5 w-4 h-4 accent-blue-600"
                             />
-                            Я ознакомлен(а) с документом, прошёл(шла) устный инструктаж и просмотрел(а) видеоматериалы
+                            Я ознакомлен(а) с документом
+                            {hasOral && ", прошёл(шла) устный инструктаж"}
+                            {hasVideo && " и просмотрел(а) видеоматериалы"}
                         </label>
                         {!videos_done && (
                             <p className="text-xs text-gray-400 mt-2">
