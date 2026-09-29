@@ -1,11 +1,49 @@
 import { Head, Link, router } from "@inertiajs/react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import AppLayout from "../../../Layouts/AppLayout";
 import Pagination from "../../../Components/Pagination";
+
+function SortIcon({ direction }) {
+    return (
+        <svg
+            className={`w-3 h-3 shrink-0 transition-transform ${direction === "desc" ? "rotate-180" : ""} ${direction ? "text-gray-700" : "text-gray-300"}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+        >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8 15l4 4 4-4M8 9l4-4 4 4" />
+        </svg>
+    );
+}
+
+const SORTABLE_COLUMNS = {
+    type:        { label: "Тип",      get: (d) => d.type },
+    title:       { label: "Код",      get: (d) => d.title },
+    description: { label: "Название", get: (d) => d.description },
+    created_at:  { label: "Добавлен", get: (d) => d.created_at_ts },
+};
 
 export default function DocumentsIndex({ documents }) {
     const params = Object.fromEntries(new URLSearchParams(window.location.search));
     const [search, setSearch] = useState(params.search ?? "");
+    const [sort, setSort] = useState({ key: null, dir: "asc" });
+
+    function toggleSort(key) {
+        setSort((prev) => prev.key === key
+            ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
+            : { key, dir: "asc" }
+        );
+    }
+
+    const sortedDocuments = useMemo(() => {
+        if (!sort.key) return documents.data;
+        const { get } = SORTABLE_COLUMNS[sort.key];
+        const dir = sort.dir === "asc" ? 1 : -1;
+        return [...documents.data].sort((a, b) => {
+            const av = get(a);
+            const bv = get(b);
+            if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
+            return String(av).localeCompare(String(bv), "ru") * dir;
+        });
+    }, [documents.data, sort]);
 
     function doSearch(e) {
         e.preventDefault();
@@ -69,29 +107,38 @@ export default function DocumentsIndex({ documents }) {
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b border-gray-100">
                         <tr>
-                            <th className="text-left px-4 py-3 font-medium text-gray-600">Тип</th>
-                            <th className="text-left px-4 py-3 font-medium text-gray-600">Код</th>
-                            <th className="text-left px-4 py-3 font-medium text-gray-600">Название</th>
+                            {Object.entries(SORTABLE_COLUMNS).map(([key, { label }]) => (
+                                <th key={key} className="text-left px-4 py-3 font-medium text-gray-600">
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleSort(key)}
+                                        className="flex items-center gap-1 hover:text-gray-900"
+                                    >
+                                        {label}
+                                        <SortIcon direction={sort.key === key ? sort.dir : null} />
+                                    </button>
+                                </th>
+                            ))}
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Версия</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Тест</th>
-                            <th className="text-left px-4 py-3 font-medium text-gray-600">Добавлен</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Статус</th>
                             <th className="px-4 py-3" />
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                        {documents.data.length === 0 ? (
+                        {sortedDocuments.length === 0 ? (
                             <tr>
                                 <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
                                     Документов нет
                                 </td>
                             </tr>
                         ) : (
-                            documents.data.map((d) => (
+                            sortedDocuments.map((d) => (
                                 <tr key={d.id} className={`hover:bg-gray-50 ${!d.has_test && !d.no_test_required ? "bg-orange-50/40" : ""}`}>
                                     <td className="px-4 py-3 text-gray-500">{d.type}</td>
                                     <td className="px-4 py-3 text-gray-500">{d.title}</td>
                                     <td className="px-4 py-3 font-medium text-gray-900">{d.description}</td>
+                                    <td className="px-4 py-3 text-gray-400">{d.created_at}</td>
                                     <td className="px-4 py-3 text-gray-500">v{d.version}</td>
                                     <td className="px-4 py-3">
                                         {d.has_test ? (
@@ -114,7 +161,6 @@ export default function DocumentsIndex({ documents }) {
                                             </span>
                                         )}
                                     </td>
-                                    <td className="px-4 py-3 text-gray-400">{d.created_at}</td>
                                     <td className="px-4 py-3">
                                         <span className={`text-xs px-2 py-0.5 rounded-full ${
                                             d.is_active

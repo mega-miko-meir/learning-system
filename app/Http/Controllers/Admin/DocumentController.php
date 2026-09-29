@@ -41,6 +41,7 @@ class DocumentController extends Controller
                 'has_test'         => $d->test_exists,
                 'no_test_required' => $d->completion_mode === 'confirmation',
                 'created_at'       => $d->created_at->format('d.m.Y'),
+                'created_at_ts'    => $d->created_at->timestamp,
             ]);
 
         return Inertia::render('Admin/Documents/Index', compact('documents'));
