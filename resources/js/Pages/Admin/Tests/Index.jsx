@@ -47,7 +47,7 @@ export default function TestsIndex({ tests }) {
             <Head title="Тесты" />
 
             <div className="flex flex-wrap items-center gap-3 mb-6">
-                <p className="text-sm text-gray-500">Всего тестов: {tests.total}</p>
+                <p className="text-sm text-gray-500">Тесты: {tests.total}</p>
 
                 <form onSubmit={doSearch} className="flex gap-2">
                     <input
