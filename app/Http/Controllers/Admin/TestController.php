@@ -15,16 +15,34 @@ use Smalot\PdfParser\Parser;
 
 class TestController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $tests = Test::with('document')
-            ->latest()
+        $sortable = [
+            'title' => 'tests.title',
+            'document' => 'documents.description',
+            'questions_count' => 'questions_count',
+            'passing_score' => 'tests.pass_percentage',
+            'is_active' => 'tests.is_active',
+        ];
+        $sortColumn = $sortable[$request->sort] ?? null;
+        $sortDir = $request->dir === 'desc' ? 'desc' : 'asc';
+
+        $tests = Test::query()
+            ->select('tests.*')
+            ->leftJoin('documents', 'documents.id', '=', 'tests.document_id')
+            ->with('document')
+            ->withCount(['questions' => fn ($q) => $q->where('is_active', true)])
+            ->when($request->search, fn ($q, $s) => $q->where(
+                fn ($q) => $q->where('tests.title', 'like', "%$s%")->orWhere('documents.description', 'like', "%$s%")
+            ))
+            ->when($sortColumn, fn ($q) => $q->orderBy($sortColumn, $sortDir), fn ($q) => $q->orderByDesc('tests.id'))
             ->paginate(20)
+            ->withQueryString()
             ->through(fn ($t) => [
                 'id' => $t->id,
                 'title' => $t->title,
                 'document' => $t->document?->display_name,
-                'questions_count' => $t->questions()->where('is_active', true)->count(),
+                'questions_count' => $t->questions_count,
                 'passing_score' => $t->passing_score,
                 'is_active' => $t->is_active,
             ]);

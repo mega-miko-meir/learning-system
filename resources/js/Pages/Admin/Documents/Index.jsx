@@ -56,6 +56,8 @@ export default function DocumentsIndex({ documents }) {
             <Head title="Документы" />
 
             <div className="flex flex-wrap items-center gap-3 mb-6">
+                <p className="text-sm text-gray-500">Документов: {documents.total}</p>
+
                 <form onSubmit={doSearch} className="flex gap-2">
                     <input
                         value={search}
