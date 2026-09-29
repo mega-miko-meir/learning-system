@@ -6,7 +6,12 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
     import.meta.url
 ).href;
 
-const RENDER_SCALE = 2;
+// Базовый масштаб растеризации страницы (в единицах PDF: 1.0 = 72 DPI). Итоговое разрешение
+// растра = BASE_RENDER_SCALE × devicePixelRatio экрана — иначе на широких мониторах и экранах
+// с масштабированием ОС (Windows 125–200%, retina) картинка получается мельче, чем показывается
+// на странице, и браузер растягивает её с размытием/пикселизацией.
+const BASE_RENDER_SCALE = 2.5;
+const MAX_DEVICE_SCALE  = 1.5; // ограничение сверху — иначе на 200%-экранах страницы станут слишком тяжёлыми
 const DEFAULT_ZOOM = 85;
 
 export default function PdfViewer({ url }) {
@@ -43,12 +48,13 @@ export default function PdfViewer({ url }) {
                 setTotal(pdf.numPages);
                 const canvas = offscreenRef.current;
                 const collected = [];
+                const renderScale = BASE_RENDER_SCALE * Math.min(window.devicePixelRatio || 1, MAX_DEVICE_SCALE);
 
                 for (let n = 1; n <= pdf.numPages; n++) {
                     if (cancelRef.current) return;
 
                     const page     = await pdf.getPage(n);
-                    const viewport = page.getViewport({ scale: RENDER_SCALE });
+                    const viewport = page.getViewport({ scale: renderScale });
 
                     canvas.width  = viewport.width;
                     canvas.height = viewport.height;
