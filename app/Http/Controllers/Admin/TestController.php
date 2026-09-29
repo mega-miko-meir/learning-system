@@ -230,7 +230,7 @@ class TestController extends Controller
     public function parsePdf(Request $request): JsonResponse
     {
         $request->validate([
-            'file' => ['required', 'file', 'max:10240'],
+            'file' => ['required', 'file', 'max:20480'],
         ]);
 
         $file = $request->file('file');
@@ -270,7 +270,12 @@ class TestController extends Controller
 
             return response()->json(['title' => $title, 'questions' => $questions]);
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Ошибка импорта теста из файла: '.$e->getMessage(), [
+                'file' => $file->getClientOriginalName(),
+                'size' => $file->getSize(),
+            ]);
+
             return response()->json([
                 'error' => 'Не удалось прочитать файл: '.$e->getMessage(),
             ], 422);

@@ -214,15 +214,24 @@ export default function TestCreate({ documents, document_id, test }) {
         const token = document.querySelector('meta[name="csrf-token"]')?.content;
 
         try {
-            const res  = await fetch(route('admin.tests.parse-pdf'), {
+            const res = await fetch(route('admin.tests.parse-pdf'), {
                 method:  'POST',
                 headers: { 'X-CSRF-TOKEN': token, 'Accept': 'application/json' },
                 body:    formData,
             });
-            const data = await res.json();
+
+            let data;
+            try {
+                data = await res.json();
+            } catch {
+                // Сервер вернул не JSON (например, HTML-страницу ошибки 413/502 от веб-сервера) —
+                // чаще всего это значит, что файл превысил лимит загрузки на сервере.
+                setImportError(`Сервер вернул неожиданный ответ (HTTP ${res.status}). Возможно, файл слишком большой для загрузки на сервер.`);
+                return;
+            }
 
             if (!res.ok) {
-                setImportError(data.error ?? 'Ошибка при разборе файла.');
+                setImportError(data.error ?? data.errors?.file?.[0] ?? data.message ?? 'Ошибка при разборе файла.');
                 return;
             }
 
