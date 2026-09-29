@@ -143,7 +143,7 @@ export default function DocumentShow({ document: doc, test, availableTests = [] 
                             <div className="space-y-2">
                                 <p className="text-sm text-gray-700 font-medium">{test.title}</p>
                                 <Link
-                                    href={route("admin.tests.show", test.id)}
+                                    href={route("admin.tests.show", test.id) + `?return_to=${doc.id}`}
                                     className="inline-block w-full text-center px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50"
                                 >
                                     Управлять тестом

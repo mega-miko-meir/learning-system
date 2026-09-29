@@ -92,17 +92,20 @@ class TestController extends Controller
         return redirect()->route('admin.tests.show', $test)->with('success', 'Тест создан.');
     }
 
-    public function show(Test $test)
+    public function show(Test $test, Request $request)
     {
         $test->load([
             'questions' => fn ($q) => $q->where('is_active', true)->orderBy('order_number'),
             'questions.answers',
         ]);
 
-        return Inertia::render('Admin/Tests/Show', compact('test'));
+        return Inertia::render('Admin/Tests/Show', [
+            'test' => $test,
+            'return_to' => $this->validReturnTo($request->query('return_to')),
+        ]);
     }
 
-    public function edit(Test $test)
+    public function edit(Test $test, Request $request)
     {
         $test->load([
             'questions' => fn ($q) => $q->where('is_active', true)->orderBy('order_number'),
@@ -113,6 +116,7 @@ class TestController extends Controller
         return Inertia::render('Admin/Tests/Create', [
             'documents' => $documents,
             'document_id' => '',
+            'return_to' => $this->validReturnTo($request->query('return_to')),
             'test' => [
                 'id' => $test->id,
                 'title' => $test->title,
@@ -191,6 +195,10 @@ class TestController extends Controller
             "Отредактирован тест «{$oldTitle}»: вопросов было {$oldQuestionsCount}, стало ".count($request->questions ?? [])
         );
 
+        if ($returnTo = $this->validReturnTo($request->input('return_to'))) {
+            return redirect()->route('admin.documents.show', $returnTo)->with('success', 'Тест обновлён.');
+        }
+
         return redirect()->route('admin.tests.show', $test)->with('success', 'Тест обновлён.');
     }
 
@@ -203,10 +211,11 @@ class TestController extends Controller
         return back()->with('success', 'Тест деактивирован.');
     }
 
-    public function forceDestroy(Test $test)
+    public function forceDestroy(Test $test, Request $request)
     {
         $title = $test->title;
         $id = $test->id;
+        $returnTo = $this->validReturnTo($request->query('return_to'));
 
         // Каскадное удаление через onDelete('cascade') в БД:
         // questions → answers, test_attempts → attempt_answers
@@ -223,8 +232,23 @@ class TestController extends Controller
             'created_at' => now(),
         ]);
 
+        if ($returnTo) {
+            return redirect()->route('admin.documents.show', $returnTo)->with('success', "Тест «{$title}» удалён.");
+        }
+
         return redirect()->route('admin.tests.index')
             ->with('success', "Тест «{$title}» удалён.");
+    }
+
+    // Проверяет, что return_to указывает на реально существующий документ — чтобы случайный
+    // или подделанный параметр в URL не привёл на несуществующую/чужую страницу.
+    private function validReturnTo(mixed $value): ?int
+    {
+        if (! $value || ! ctype_digit((string) $value)) {
+            return null;
+        }
+
+        return Document::whereKey($value)->exists() ? (int) $value : null;
     }
 
     public function parsePdf(Request $request): JsonResponse

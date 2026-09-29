@@ -166,8 +166,15 @@ function QuestionCard({ q, index, onChange, onRemove, hasError }) {
 }
 
 // ── Главная форма ───────────────────────────────────────────────────
-export default function TestCreate({ documents, document_id, test }) {
+export default function TestCreate({ documents, document_id, test, return_to }) {
     const isEdit = !!test;
+
+    // Если пришли из карточки документа (кнопка «Управлять тестом») — после сохранения/отмены
+    // возвращаем туда же, а не на страницу теста/в общий список.
+    const backHref = return_to
+        ? route("admin.documents.show", return_to)
+        : (isEdit ? route("admin.tests.show", test.id) : route("admin.tests.index"));
+    const backLabel = return_to ? "К документу" : (isEdit ? "К тесту" : "Тесты");
 
     const [title, setTitle]               = useState(test?.title ?? "");
 
@@ -269,6 +276,7 @@ export default function TestCreate({ documents, document_id, test }) {
             max_attempts:  maxAttempts,
             is_active:     isActive,
             force_replace: forceReplace,
+            return_to:     return_to || undefined,
             questions:     questions.map((q, qi) => ({
                 text:    q.text,
                 type:    q.type,
@@ -330,9 +338,8 @@ export default function TestCreate({ documents, document_id, test }) {
 
             <div className="mb-6">
                 <p className="text-xs text-gray-400">
-                    <Link href={isEdit ? route("admin.tests.show", test.id) : route("admin.tests.index")}
-                        className="hover:underline">
-                        ← {isEdit ? "К тесту" : "Тесты"}
+                    <Link href={backHref} className="hover:underline">
+                        ← {backLabel}
                     </Link>
                 </p>
             </div>
@@ -537,7 +544,7 @@ d) Вариант Г`}</pre>
                         {submitting ? "Сохраняем..." : isEdit ? "Сохранить изменения" : "Сохранить тест"}
                     </button>
                     <Link
-                        href={isEdit ? route("admin.tests.show", test.id) : route("admin.tests.index")}
+                        href={backHref}
                         className="px-6 py-2.5 border border-gray-200 text-gray-600 text-sm rounded-xl hover:bg-gray-50"
                     >
                         Отмена

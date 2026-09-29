@@ -110,8 +110,14 @@ function QuestionCard({ question, testId, onDelete }) {
     );
 }
 
-export default function TestShow({ test }) {
+export default function TestShow({ test, return_to }) {
     const [addingQ, setAddingQ] = useState(false);
+
+    // Если пришли из карточки документа (кнопка «Управлять тестом») — назад и после удаления
+    // теста возвращаемся туда же, а не в общий список тестов.
+    const backHref = return_to ? route("admin.documents.show", return_to) : route("admin.tests.index");
+    const backLabel = return_to ? "Документ" : "Тесты";
+    const editHref = route("admin.tests.edit", test.id) + (return_to ? `?return_to=${return_to}` : "");
     const { data, setData, post, processing, reset } = useForm({
         text: "", type: "single", order: "",
     });
@@ -132,7 +138,8 @@ export default function TestShow({ test }) {
 
     function deleteTest() {
         if (confirm(`Удалить тест «${test.title}» навсегда?\n\nБудут удалены все вопросы, ответы и результаты прохождений. Это действие нельзя отменить.`)) {
-            router.delete(route("admin.tests.force-delete", test.id));
+            const url = route("admin.tests.force-delete", test.id) + (return_to ? `?return_to=${return_to}` : "");
+            router.delete(url);
         }
     }
 
@@ -141,7 +148,7 @@ export default function TestShow({ test }) {
             <Head title={test.title} />
 
             <p className="text-xs text-gray-400 mb-6">
-                <Link href={route("admin.tests.index")} className="hover:underline">← Тесты</Link>
+                <Link href={backHref} className="hover:underline">← {backLabel}</Link>
             </p>
 
             <div className="flex items-center justify-between mb-6">
@@ -157,7 +164,7 @@ export default function TestShow({ test }) {
                 </div>
                 <div className="flex gap-2">
                     <Link
-                        href={route("admin.tests.edit", test.id)}
+                        href={editHref}
                         className="px-4 py-2 border border-gray-200 text-sm rounded-lg hover:bg-gray-50"
                     >
                         Редактировать
