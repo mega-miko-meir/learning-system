@@ -6,13 +6,16 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
     import.meta.url
 ).href;
 
-// Базовый масштаб растеризации страницы (в единицах PDF: 1.0 = 72 DPI). Итоговое разрешение
-// растра = BASE_RENDER_SCALE × devicePixelRatio экрана — иначе на широких мониторах и экранах
-// с масштабированием ОС (Windows 125–200%, retina) картинка получается мельче, чем показывается
-// на странице, и браузер растягивает её с размытием/пикселизацией.
-const BASE_RENDER_SCALE = 2.5;
-const MAX_DEVICE_SCALE  = 1.5; // ограничение сверху — иначе на 200%-экранах страницы станут слишком тяжёлыми
-const DEFAULT_ZOOM = 85;
+// Раньше ширина страницы на экране считалась как % от ширины контейнера (который часто шире,
+// чем реальное разрешение отрендеренной картинки) — из-за этого страница растягивалась сверх
+// своего фактического разрешения и получалась размытой/блочной независимо от того, насколько
+// детально её отрендерил pdf.js. Теперь 100% зума = ровно BASE_DISPLAY_WIDTH CSS-пикселей вне
+// зависимости от ширины контейнера, а растеризация делается с запасом (BASE_DISPLAY_WIDTH ×
+// devicePixelRatio экрана), поэтому картинка на экране никогда не увеличивается сверх своего
+// реального разрешения — только уменьшается (что всегда чётко) при узком экране/при зуме < 100%.
+const BASE_DISPLAY_WIDTH = 850; // ширина страницы в CSS-пикселях при 100% — как одна страница A4/Letter на экране
+const MAX_DEVICE_SCALE   = 2;   // ограничение сверху — иначе на 200%+ экранах страницы станут слишком тяжёлыми
+const DEFAULT_ZOOM = 100;
 
 export default function PdfViewer({ url }) {
     const [pages,       setPages]       = useState([]);
@@ -48,13 +51,20 @@ export default function PdfViewer({ url }) {
                 setTotal(pdf.numPages);
                 const canvas = offscreenRef.current;
                 const collected = [];
-                const renderScale = BASE_RENDER_SCALE * Math.min(window.devicePixelRatio || 1, MAX_DEVICE_SCALE);
+                const dpr = Math.min(window.devicePixelRatio || 1, MAX_DEVICE_SCALE);
 
                 for (let n = 1; n <= pdf.numPages; n++) {
                     if (cancelRef.current) return;
 
-                    const page     = await pdf.getPage(n);
-                    const viewport = page.getViewport({ scale: renderScale });
+                    const page = await pdf.getPage(n);
+
+                    // Масштаб подбирается так, чтобы BASE_DISPLAY_WIDTH CSS-пикселей (размер
+                    // страницы при 100% зума) точно совпал с devicePixelRatio физических пикселей —
+                    // раствор всегда ровно достаточен для чёткой картинки, без запаса «на всякий
+                    // случай» и без недостачи.
+                    const nativeWidth = page.getViewport({ scale: 1 }).width; // ширина страницы в pt PDF
+                    const renderScale = (BASE_DISPLAY_WIDTH / nativeWidth) * dpr;
+                    const viewport    = page.getViewport({ scale: renderScale });
 
                     canvas.width  = viewport.width;
                     canvas.height = viewport.height;
@@ -65,7 +75,10 @@ export default function PdfViewer({ url }) {
 
                     if (cancelRef.current) return;
 
-                    collected.push(canvas.toDataURL("image/png"));
+                    collected.push({
+                        src:   canvas.toDataURL("image/png"),
+                        width: viewport.width / dpr, // CSS-ширина страницы при zoom = 100%
+                    });
                     setPages([...collected]);
                 }
 
@@ -126,7 +139,7 @@ export default function PdfViewer({ url }) {
         setZoom(prev => Math.max(40, Math.min(prev + delta, 200)));
     }
 
-    function fitWidth() {
+    function resetZoom() {
         setZoom(DEFAULT_ZOOM);
     }
 
@@ -179,10 +192,10 @@ export default function PdfViewer({ url }) {
                     >+</button>
 
                     <button
-                        onClick={fitWidth}
+                        onClick={resetZoom}
                         className="px-2 py-1 rounded hover:bg-gray-700 text-xs text-gray-300 border border-gray-600 ml-1"
                     >
-                        По ширине
+                        Сброс
                     </button>
                 </div>
 
@@ -214,16 +227,16 @@ export default function PdfViewer({ url }) {
                 )}
 
                 <div className="flex flex-col items-center gap-3">
-                    {pages.map((src, i) => (
+                    {pages.map((p, i) => (
                         <div
                             key={i}
                             ref={(el) => (pageRefs.current[i] = el)}
                             data-page={i + 1}
                             className="shadow-xl shrink-0"
-                            style={{ width: `${zoom}%` }}
+                            style={{ width: `${p.width * (zoom / 100)}px` }}
                         >
                             <img
-                                src={src}
+                                src={p.src}
                                 alt={`Страница ${i + 1}`}
                                 className="w-full block"
                                 draggable="false"
