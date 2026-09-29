@@ -1,9 +1,8 @@
 import { Head, Link, useForm, usePage, router } from "@inertiajs/react";
 import { useRef, useState } from "react";
 import AppLayout from "../../../Layouts/AppLayout";
-import InductionMaterials from "../../../Components/InductionMaterials";
 
-export default function DocumentShow({ document: doc, test, materials = [], availableTests = [] }) {
+export default function DocumentShow({ document: doc, test, availableTests = [] }) {
     // Первичный инструктаж без теста включается флагом FEATURE_INDUCTION (config/features.php)
     const inductionEnabled = !!usePage().props.features?.induction;
     const isConfirmation = inductionEnabled && doc.completion_mode === "confirmation";
@@ -135,9 +134,6 @@ export default function DocumentShow({ document: doc, test, materials = [], avai
                             </button>
                         </div>
                     </div>
-
-                    {/* Обучение без теста: видео и устный инструктаж вместо теста */}
-                    {isConfirmation && <InductionMaterials document={doc} materials={materials} />}
 
                     {/* Тест к документу */}
                     {!isConfirmation && (

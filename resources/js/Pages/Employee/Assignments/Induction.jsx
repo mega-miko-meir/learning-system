@@ -180,13 +180,6 @@ export default function Induction({ assignment, materials, videos_done, threshol
                     </p>
                 </div>
 
-                {materials.length === 0 && (
-                    <div className="bg-white rounded-xl border border-gray-100 p-5 text-sm text-gray-500">
-                        Дополнительных материалов к этому документу нет — изучите сам документ и подтвердите
-                        ознакомление ниже.
-                    </div>
-                )}
-
                 {materials.map((m) =>
                     m.kind === "video" ? (
                         <VideoItem
