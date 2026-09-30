@@ -105,6 +105,7 @@ Route::middleware(['auth', 'user.active'])->group(function () {
 
         // Матрица обучения
         Route::get('/matrix', [\App\Http\Controllers\Admin\MatrixController::class, 'index'])->name('matrix.index');
+        Route::get('/matrix/export', [\App\Http\Controllers\Admin\MatrixController::class, 'export'])->name('matrix.export');
         Route::post('/matrix', [\App\Http\Controllers\Admin\MatrixController::class, 'store'])->name('matrix.store');
         Route::patch('/matrix/{matrix}', [\App\Http\Controllers\Admin\MatrixController::class, 'update'])->name('matrix.update');
         Route::delete('/matrix/{matrix}', [\App\Http\Controllers\Admin\MatrixController::class, 'destroy'])->name('matrix.destroy');

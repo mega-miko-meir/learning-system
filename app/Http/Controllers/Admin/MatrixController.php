@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exports\MatrixExport;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Department;
@@ -13,6 +14,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
+use Maatwebsite\Excel\Facades\Excel;
 
 class MatrixController extends Controller
 {
@@ -48,6 +50,40 @@ class MatrixController extends Controller
         $documents = Document::active()->orderBy('description')->get(['id', 'title', 'description']);
 
         return Inertia::render('Admin/Matrix/Index', compact('matrix', 'positions', 'documents', 'departments'));
+    }
+
+    // Экспорт с учётом тех же фильтров/поиска, что применены на странице (там они клиентские,
+    // поэтому фронт передаёт их сюда параметрами запроса при клике на кнопку выгрузки).
+    public function export(Request $request)
+    {
+        $departmentId = $request->integer('department_id') ?: null;
+        $positionId = $request->integer('position_id') ?: null;
+        $search = $request->input('search');
+
+        $rows = TrainingMatrix::active()
+            ->with(['position.department', 'document'])
+            ->when($departmentId, fn ($q) => $q->whereHas('position', fn ($q) => $q->where('department_id', $departmentId)))
+            ->when($positionId, fn ($q) => $q->where('position_id', $positionId))
+            ->orderBy('position_id')
+            ->get()
+            ->filter(function ($m) use ($search) {
+                if (! $search) {
+                    return true;
+                }
+                $needle = mb_strtolower($search);
+                foreach ([$m->position->name, $m->position->department?->name, $m->document->display_name, $m->document->title] as $haystack) {
+                    if ($haystack && str_contains(mb_strtolower($haystack), $needle)) {
+                        return true;
+                    }
+                }
+
+                return false;
+            })
+            ->values();
+
+        $filename = 'training_matrix_'.now()->format('Ymd_His').'.xlsx';
+
+        return Excel::download(new MatrixExport($rows), $filename);
     }
 
     public function store(Request $request)
