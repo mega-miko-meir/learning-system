@@ -24,14 +24,22 @@ const READING_MINUTES = [5, 10, 15, 20, 30, 45, 60];
 export default function AssignmentsIndex({ assignments, departments, positions, documents, employees }) {
     const params = Object.fromEntries(new URLSearchParams(window.location.search));
 
-    // ── Поиск по сотруднику (фронтенд) ───────────────────────────────
-    const [search, setSearch] = useState("");
+    // ── Поиск по сотруднику (серверный — иначе находил только на текущей странице) ────
+    const [search, setSearch] = useState(params.search ?? "");
 
-    const visibleRows = search.trim()
-        ? assignments.data.filter((a) =>
-              a.user.toLowerCase().includes(search.trim().toLowerCase())
-          )
-        : assignments.data;
+    function doSearch(e) {
+        e.preventDefault();
+        router.get(route("admin.assignments.index"), { ...params, search: search || undefined }, {
+            preserveState: true, replace: true,
+        });
+    }
+
+    function clearSearch() {
+        setSearch("");
+        router.get(route("admin.assignments.index"), { ...params, search: undefined }, {
+            preserveState: true, replace: true,
+        });
+    }
 
     // ── Bulk assign form ──────────────────────────────────────────────
     const [showBulk,     setShowBulk]     = useState(false);
@@ -155,24 +163,30 @@ export default function AssignmentsIndex({ assignments, departments, positions, 
 
             {/* ── Фильтры и кнопка ── */}
             <div className="flex flex-wrap gap-2 mb-6 items-center">
-                <div className="relative">
-                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 105 11a6 6 0 0012 0z" />
-                    </svg>
-                    <input
-                        type="text"
-                        placeholder="Поиск по сотруднику..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-52"
-                    />
-                    {search && (
-                        <button
-                            onClick={() => setSearch("")}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                        >×</button>
-                    )}
-                </div>
+                <form onSubmit={doSearch} className="flex gap-2">
+                    <div className="relative">
+                        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 105 11a6 6 0 0012 0z" />
+                        </svg>
+                        <input
+                            type="text"
+                            placeholder="Поиск по сотруднику..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-52"
+                        />
+                        {search && (
+                            <button
+                                type="button"
+                                onClick={clearSearch}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            >×</button>
+                        )}
+                    </div>
+                    <button className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm hover:border-gray-300">
+                        Найти
+                    </button>
+                </form>
 
                 <select
                     value={params.status ?? ""}
@@ -206,9 +220,9 @@ export default function AssignmentsIndex({ assignments, departments, positions, 
                     Только активные сотрудники
                 </label>
 
-                {search && (
+                {params.search && (
                     <span className="text-xs text-gray-400">
-                        Найдено: {visibleRows.length}
+                        Найдено: {assignments.total}
                     </span>
                 )}
 
@@ -417,14 +431,14 @@ export default function AssignmentsIndex({ assignments, departments, positions, 
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                        {visibleRows.length === 0 ? (
+                        {assignments.data.length === 0 ? (
                             <tr>
                                 <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
-                                    {search ? "Сотрудник не найден" : "Назначений нет"}
+                                    {params.search ? "Сотрудник не найден" : "Назначений нет"}
                                 </td>
                             </tr>
                         ) : (
-                            visibleRows.map((a) => (
+                            assignments.data.map((a) => (
                                 <tr key={a.id} className="hover:bg-gray-50">
                                     <td className="px-4 py-3">
                                         <Link
@@ -510,7 +524,7 @@ export default function AssignmentsIndex({ assignments, departments, positions, 
                 </table>
             </div>
 
-            {!search && <Pagination links={assignments.links} />}
+            <Pagination links={assignments.links} />
 
             {/* ── Модал редактирования ── */}
             {editing && (

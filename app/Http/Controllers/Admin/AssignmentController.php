@@ -24,6 +24,11 @@ class AssignmentController extends Controller
         $activeOnly = $request->boolean('active_only', true);
 
         $assignments = TrainingAssignment::with(['user', 'document'])
+            ->when($request->search, fn ($q, $s) => $q->whereHas('user', fn ($u) => $u->where(
+                fn ($u) => $u->where('last_name', 'like', "%$s%")
+                    ->orWhere('first_name', 'like', "%$s%")
+                    ->orWhere('middle_name', 'like', "%$s%")
+            )))
             ->when($request->status, fn ($q, $s) => $q->where('status', $s))
             ->when($request->department_id, fn ($q, $d) => $q->whereHas('user', fn ($u) => $u->where('department_id', $d))
             )
