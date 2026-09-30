@@ -30,9 +30,10 @@ export default function AssignmentShow({ assignment }) {
     const storedSeconds  = parseInt(sessionStorage.getItem(sessionKey(id)) ?? "0", 10);
     const initialSeconds = Math.max(time_spent_seconds ?? 0, storedSeconds);
 
-    const [spent, setSpent] = useState(initialSeconds);
-    const spentRef          = useRef(initialSeconds);
-    const isReadonly        = ["completed", "failed", "expired"].includes(status);
+    const [spent, setSpent]     = useState(initialSeconds);
+    const spentRef              = useRef(initialSeconds);
+    const [skipping, setSkipping] = useState(false);
+    const isReadonly            = ["completed", "failed", "expired"].includes(status);
 
     const remaining = Math.max(0, required_seconds - spent);
     const unlocked  = serverUnlocked || remaining === 0;
@@ -97,6 +98,25 @@ export default function AssignmentShow({ assignment }) {
         window.axios.post(route("employee.assignments.heartbeat", id), { seconds });
     }
 
+    // «Я всё прочитал(а)» — принудительно завершает таймер чтения досрочно: фиксирует на сервере
+    // полное требуемое время (та же логика, что уже применяется при обычном истечении таймера,
+    // просто раньше), закрывает документ и сразу ведёт к тесту.
+    async function skipTimer() {
+        if (skipping) return;
+        setSkipping(true);
+        try {
+            await window.axios.post(route("employee.assignments.heartbeat", id), { seconds: required_seconds });
+            sessionStorage.setItem(sessionKey(id), String(required_seconds));
+            spentRef.current = required_seconds;
+            setSpent(required_seconds);
+            if (has_test) {
+                router.visit(route("employee.test.show", id));
+            }
+        } finally {
+            setSkipping(false);
+        }
+    }
+
     return (
         <AppLayout fullHeight>
             <Head title={doc.title} />
@@ -125,11 +145,13 @@ export default function AssignmentShow({ assignment }) {
                             <span className="font-mono text-sm font-bold text-blue-600 tabular-nums w-12 text-right">
                                 {formatTime(remaining)}
                             </span>
-                            {has_test && (
-                                <button disabled className="px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-400 cursor-not-allowed">
-                                    К тесту
-                                </button>
-                            )}
+                            <button
+                                onClick={skipTimer}
+                                disabled={skipping}
+                                className="px-3 py-1.5 rounded-lg text-xs font-medium border border-blue-200 text-blue-600 hover:bg-blue-50 disabled:opacity-50"
+                            >
+                                {skipping ? "Завершаем..." : "Я всё прочитал(а)"}
+                            </button>
                         </>
                     )}
 
