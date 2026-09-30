@@ -63,4 +63,14 @@ class Document extends Model
     {
         return $query->where('is_active', true);
     }
+
+    // Сортировка по отображаемому названию (то же значение, что display_name). Некоторые записи
+    // хранят название в кавычках («...» или "..."), которые в SQL-сортировке идут раньше букв —
+    // без нормализации такие документы выпадали в начало списка, а не на своё место по алфавиту.
+    public function scopeOrderedByName($query)
+    {
+        return $query->orderByRaw(
+            "TRIM(BOTH '»' FROM TRIM(BOTH '«' FROM TRIM(BOTH '\"' FROM COALESCE(NULLIF(description, ''), title)))) ASC"
+        );
+    }
 }

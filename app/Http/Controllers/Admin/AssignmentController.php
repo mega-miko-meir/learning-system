@@ -54,7 +54,7 @@ class AssignmentController extends Controller
         $departments = Department::active()->orderBy('name')->get(['id', 'name']);
         $positions = Position::active()->with('department')->orderBy('name')
             ->get(['id', 'name', 'department_id']);
-        $documents = Document::active()->orderBy('description')->get(['id', 'title', 'description']);
+        $documents = Document::active()->orderedByName()->get(['id', 'title', 'description']);
         $employees = User::active()
             ->whereIn('role', ['employee', 'hr_admin', 'manager'])
             ->with(['department', 'position'])

@@ -54,7 +54,7 @@ class TestController extends Controller
 
     public function create(Request $request)
     {
-        $documents = Document::active()->orderBy('description')->get(['id', 'title', 'description', 'type', 'version']);
+        $documents = Document::active()->orderedByName()->get(['id', 'title', 'description', 'type', 'version']);
 
         return Inertia::render('Admin/Tests/Create', [
             'documents' => $documents,
@@ -131,7 +131,7 @@ class TestController extends Controller
             'questions' => fn ($q) => $q->where('is_active', true)->orderBy('order_number'),
             'questions.answers',
         ]);
-        $documents = Document::active()->orderBy('description')->get(['id', 'title', 'description', 'type', 'version']);
+        $documents = Document::active()->orderedByName()->get(['id', 'title', 'description', 'type', 'version']);
 
         return Inertia::render('Admin/Tests/Create', [
             'documents' => $documents,

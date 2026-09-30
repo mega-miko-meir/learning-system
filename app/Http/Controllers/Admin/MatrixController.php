@@ -47,7 +47,7 @@ class MatrixController extends Controller
                 'department_id' => $p->department_id,
                 'department' => $p->department?->name,
             ]);
-        $documents = Document::active()->orderBy('description')->get(['id', 'title', 'description']);
+        $documents = Document::active()->orderedByName()->get(['id', 'title', 'description']);
 
         return Inertia::render('Admin/Matrix/Index', compact('matrix', 'positions', 'documents', 'departments'));
     }
