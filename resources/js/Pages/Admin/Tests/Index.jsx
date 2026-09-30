@@ -19,6 +19,7 @@ const SORTABLE_COLUMNS = {
     document:         { label: "Документ" },
     questions_count:  { label: "Вопросов" },
     passing_score:    { label: "Порог" },
+    time_limit:       { label: "Время на прохождение" },
     is_active:        { label: "Статус" },
 };
 
@@ -91,7 +92,7 @@ export default function TestsIndex({ tests }) {
                     <tbody className="divide-y divide-gray-50">
                         {tests.data.length === 0 ? (
                             <tr>
-                                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
                                     Тестов нет
                                 </td>
                             </tr>
@@ -102,6 +103,7 @@ export default function TestsIndex({ tests }) {
                                     <td className="px-4 py-3 text-gray-500">{t.document ?? "—"}</td>
                                     <td className="px-4 py-3 text-gray-500">{t.questions_count}</td>
                                     <td className="px-4 py-3 text-gray-500">{t.passing_score}%</td>
+                                    <td className="px-4 py-3 text-gray-500">{t.time_limit ? `${t.time_limit} мин` : "Без ограничения"}</td>
                                     <td className="px-4 py-3">
                                         <span className={`text-xs px-2 py-0.5 rounded-full ${
                                             t.is_active ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"

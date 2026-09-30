@@ -22,6 +22,7 @@ class TestController extends Controller
             'document' => 'documents.description',
             'questions_count' => 'questions_count',
             'passing_score' => 'tests.pass_percentage',
+            'time_limit' => 'tests.time_limit_minutes',
             'is_active' => 'tests.is_active',
         ];
         $sortColumn = $sortable[$request->sort] ?? null;
@@ -44,6 +45,7 @@ class TestController extends Controller
                 'document' => $t->document?->display_name,
                 'questions_count' => $t->questions_count,
                 'passing_score' => $t->passing_score,
+                'time_limit' => $t->time_limit_minutes,
                 'is_active' => $t->is_active,
             ]);
 

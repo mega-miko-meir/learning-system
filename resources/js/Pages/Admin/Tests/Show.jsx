@@ -157,6 +157,7 @@ export default function TestShow({ test, return_to }) {
                     <p className="text-sm text-gray-400">
                         Порог: {test.passing_score}% ·{" "}
                         {test.questions?.length ?? 0} вопросов ·{" "}
+                        Время на прохождение: {test.time_limit_minutes ? `${test.time_limit_minutes} мин` : "без ограничения"} ·{" "}
                         <span className={test.is_active ? "text-green-600" : "text-gray-400"}>
                             {test.is_active ? "Активен" : "Неактивен"}
                         </span>
