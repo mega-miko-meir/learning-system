@@ -65,10 +65,11 @@ class ReportController extends Controller
                 $failed    = (int) ($s?->failed ?? 0);
 
                 return [
-                    'id'         => $emp->id,
-                    'full_name'  => $emp->full_name,
-                    'department' => $emp->department?->name,
-                    'position'   => $emp->position?->name,
+                    'id'            => $emp->id,
+                    'full_name'     => $emp->full_name,
+                    'department_id' => $emp->department_id,
+                    'department'    => $emp->department?->name,
+                    'position'      => $emp->position?->name,
                     'total'      => $total,
                     'completed'  => $completed,
                     'overdue'    => $overdue,
@@ -78,7 +79,12 @@ class ReportController extends Controller
             })
             ->values();
 
-        return Inertia::render('Admin/Reports/Index', compact('summary', 'byDepartment', 'employees'));
+        // Некоторые admin-ы одновременно являются руководителями (есть подчинённые в manager_id).
+        // Доступ ко всей компании у admin не ограничивается — это просто список id для необязательного
+        // переключателя «Моя вертикаль» на фронте; если подчинённых нет, фронт переключатель не покажет.
+        $myVerticalIds = auth()->user()->subordinateIds();
+
+        return Inertia::render('Admin/Reports/Index', compact('summary', 'byDepartment', 'employees', 'myVerticalIds'));
     }
 
     public function employee(User $user)

@@ -49,7 +49,16 @@ class MatrixController extends Controller
             ]);
         $documents = Document::active()->orderedByName()->get(['id', 'title', 'description']);
 
-        return Inertia::render('Admin/Matrix/Index', compact('matrix', 'positions', 'documents', 'departments'));
+        // Для необязательного переключателя «Моя вертикаль» (admin, у которого есть подчинённые):
+        // должности, которые реально занимают его подчинённые — по ним фильтруются строки матрицы.
+        $myVerticalPositionIds = User::whereIn('id', auth()->user()->subordinateIds())
+            ->whereNotNull('position_id')
+            ->distinct()
+            ->pluck('position_id');
+
+        return Inertia::render('Admin/Matrix/Index', compact(
+            'matrix', 'positions', 'documents', 'departments', 'myVerticalPositionIds'
+        ));
     }
 
     // Экспорт с учётом тех же фильтров/поиска, что применены на странице (там они клиентские,

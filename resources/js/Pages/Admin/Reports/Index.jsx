@@ -2,12 +2,49 @@ import { Head, Link } from "@inertiajs/react";
 import { useMemo, useState } from "react";
 import AppLayout from "../../../Layouts/AppLayout";
 
-export default function ReportsIndex({ summary, byDepartment, employees }) {
+// Пересчитывает карточки «Прогресс по отделам» из отфильтрованного списка сотрудников —
+// нужно, когда admin переключается на «Мою вертикаль», чтобы цифры совпадали со списком ниже.
+function aggregateByDepartment(emps) {
+    const byId = {};
+    emps.forEach((e) => {
+        const key = e.department_id ?? "none";
+        const name = e.department ?? "Без отдела";
+        byId[key] = byId[key] ?? { id: e.department_id, name, employees: 0, total: 0, completed: 0 };
+        byId[key].employees += 1;
+        byId[key].total += e.total;
+        byId[key].completed += e.completed;
+    });
+    return Object.values(byId)
+        .map((d) => ({ ...d, percent: d.total > 0 ? Math.round(d.completed / d.total * 100) : 0 }))
+        .sort((a, b) => a.name.localeCompare(b.name, "ru"));
+}
+
+export default function ReportsIndex({ summary, byDepartment, employees, myVerticalIds = [] }) {
     const [departmentId, setDepartmentId] = useState("");
     const [dateFrom, setDateFrom] = useState("");
     const [dateTo, setDateTo]     = useState("");
     const [status, setStatus]     = useState("");
     const [search, setSearch]     = useState("");
+
+    // Admin, который одновременно руководитель (есть подчинённые), может посмотреть на отчёт
+    // только по своей вертикали — доступ ко всей компании при этом никуда не пропадает.
+    const [scope, setScope] = useState("all"); // "all" | "mine"
+    const hasOwnVertical = myVerticalIds.length > 0;
+    const myVerticalSet = useMemo(() => new Set(myVerticalIds), [myVerticalIds]);
+
+    const scopedEmployees = useMemo(
+        () => scope === "mine" ? employees.filter((e) => myVerticalSet.has(e.id)) : employees,
+        [scope, employees, myVerticalSet]
+    );
+
+    const scopedSummary = scope === "mine" ? {
+        total_employees:     scopedEmployees.length,
+        assignments_total:   scopedEmployees.reduce((s, e) => s + e.total, 0),
+        assignments_done:    scopedEmployees.reduce((s, e) => s + e.completed, 0),
+        assignments_overdue: scopedEmployees.reduce((s, e) => s + e.overdue, 0),
+    } : summary;
+
+    const scopedByDepartment = scope === "mine" ? aggregateByDepartment(scopedEmployees) : byDepartment;
 
     function buildExportUrl() {
         const p = new URLSearchParams();
@@ -27,18 +64,39 @@ export default function ReportsIndex({ summary, byDepartment, employees }) {
     }
 
     const filtered = useMemo(() => {
-        if (!search.trim()) return employees;
+        if (!search.trim()) return scopedEmployees;
         const q = search.trim().toLowerCase();
-        return employees.filter((e) =>
+        return scopedEmployees.filter((e) =>
             e.full_name.toLowerCase().includes(q) ||
             (e.department ?? "").toLowerCase().includes(q) ||
             (e.position ?? "").toLowerCase().includes(q)
         );
-    }, [search, employees]);
+    }, [search, scopedEmployees]);
 
     return (
         <AppLayout title="Отчёты">
             <Head title="Отчёты" />
+
+            {/* Переключатель «Вся компания» / «Моя вертикаль» — только если у admin есть подчинённые */}
+            {hasOwnVertical && (
+                <div className="inline-flex items-center gap-1 p-1 bg-gray-100 rounded-lg mb-6">
+                    {[
+                        { key: "all",  label: "Вся компания" },
+                        { key: "mine", label: "Моя вертикаль (как руководителя)" },
+                    ].map(({ key, label }) => (
+                        <button
+                            key={key}
+                            type="button"
+                            onClick={() => setScope(key)}
+                            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                                scope === key ? "bg-white text-gray-900 shadow-sm font-medium" : "text-gray-500 hover:text-gray-700"
+                            }`}
+                        >
+                            {label}
+                        </button>
+                    ))}
+                </div>
+            )}
 
             {/* Экспорт отчётов */}
             <div className="bg-white rounded-xl border border-gray-100 p-5 mb-6">
@@ -109,10 +167,10 @@ export default function ReportsIndex({ summary, byDepartment, employees }) {
             {/* Сводка */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 {[
-                    { label: "Сотрудников",      value: summary.total_employees,     color: "text-blue-600" },
-                    { label: "Всего назначений", value: summary.assignments_total,   color: "text-gray-700" },
-                    { label: "Выполнено",         value: summary.assignments_done,    color: "text-green-600" },
-                    { label: "Просрочено",        value: summary.assignments_overdue, color: "text-red-600"   },
+                    { label: "Сотрудников",      value: scopedSummary.total_employees,     color: "text-blue-600" },
+                    { label: "Всего назначений", value: scopedSummary.assignments_total,   color: "text-gray-700" },
+                    { label: "Выполнено",         value: scopedSummary.assignments_done,    color: "text-green-600" },
+                    { label: "Просрочено",        value: scopedSummary.assignments_overdue, color: "text-red-600"   },
                 ].map(({ label, value, color }) => (
                     <div key={label} className="bg-white rounded-xl border border-gray-100 p-5">
                         <p className="text-sm text-gray-400 mb-1">{label}</p>
@@ -124,20 +182,24 @@ export default function ReportsIndex({ summary, byDepartment, employees }) {
             {/* По отделам */}
             <div className="bg-white rounded-xl border border-gray-100 p-5 mb-6">
                 <h2 className="text-sm font-semibold text-gray-700 mb-5">Прогресс по отделам</h2>
-                {byDepartment.length === 0 ? (
+                {scopedByDepartment.length === 0 ? (
                     <p className="text-sm text-gray-400">Нет данных</p>
                 ) : (
                     <div className="space-y-5">
-                        {byDepartment.map((dept) => (
-                            <div key={dept.id}>
+                        {scopedByDepartment.map((dept) => (
+                            <div key={dept.id ?? dept.name}>
                                 <div className="flex items-center justify-between mb-1.5">
                                     <div className="flex items-center gap-3">
-                                        <Link
-                                            href={route("admin.reports.department", dept.id)}
-                                            className="text-sm font-medium text-blue-600 hover:underline"
-                                        >
-                                            {dept.name}
-                                        </Link>
+                                        {dept.id ? (
+                                            <Link
+                                                href={route("admin.reports.department", dept.id)}
+                                                className="text-sm font-medium text-blue-600 hover:underline"
+                                            >
+                                                {dept.name}
+                                            </Link>
+                                        ) : (
+                                            <span className="text-sm font-medium text-gray-700">{dept.name}</span>
+                                        )}
                                         <span className="text-xs text-gray-400">
                                             {dept.employees} чел.
                                         </span>

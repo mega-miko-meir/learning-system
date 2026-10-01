@@ -429,11 +429,17 @@ function AddForm({ positions, documents, departments }) {
     );
 }
 
-export default function MatrixIndex({ matrix, positions, documents, departments }) {
+export default function MatrixIndex({ matrix, positions, documents, departments, myVerticalPositionIds = [] }) {
     const [search,     setSearch]     = useState("");
     const [filterDept, setFilterDept] = useState("");
     const [filterPos,  setFilterPos]  = useState("");
     const [editItem,   setEditItem]   = useState(null);
+
+    // Admin, который одновременно руководитель (есть подчинённые), может сузить матрицу до должностей,
+    // которые реально занимают его подчинённые — доступ ко всей матрице при этом не теряется.
+    const [scope, setScope] = useState("all"); // "all" | "mine"
+    const hasOwnVertical = myVerticalPositionIds.length > 0;
+    const myVerticalPosSet = useMemo(() => new Set(myVerticalPositionIds), [myVerticalPositionIds]);
 
     function remove(id) {
         if (confirm("Удалить запись из матрицы?")) {
@@ -454,11 +460,12 @@ export default function MatrixIndex({ matrix, positions, documents, departments 
     const q = search.trim().toLowerCase();
 
     const filtered = useMemo(() => matrix.filter((m) => {
+        if (scope === "mine" && !myVerticalPosSet.has(m.position_id)) return false;
         if (filterDept && m.department_id !== Number(filterDept)) return false;
         if (filterPos  && m.position_id  !== Number(filterPos))  return false;
         if (q && ![m.position, m.document, m.document_code, m.department].some((v) => v?.toLowerCase().includes(q))) return false;
         return true;
-    }), [matrix, filterDept, filterPos, q]);
+    }), [matrix, scope, myVerticalPosSet, filterDept, filterPos, q]);
 
     const grouped = filtered.reduce((acc, m) => {
         const key = m.department ?? "Без отдела";
@@ -472,6 +479,26 @@ export default function MatrixIndex({ matrix, positions, documents, departments 
             <Head title="Матрица обучения" />
 
             {editItem && <EditModal item={editItem} onClose={() => setEditItem(null)} />}
+
+            {hasOwnVertical && (
+                <div className="inline-flex items-center gap-1 p-1 bg-gray-100 rounded-lg mb-4">
+                    {[
+                        { key: "all",  label: "Вся компания" },
+                        { key: "mine", label: "Моя вертикаль (как руководителя)" },
+                    ].map(({ key, label }) => (
+                        <button
+                            key={key}
+                            type="button"
+                            onClick={() => setScope(key)}
+                            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                                scope === key ? "bg-white text-gray-900 shadow-sm font-medium" : "text-gray-500 hover:text-gray-700"
+                            }`}
+                        >
+                            {label}
+                        </button>
+                    ))}
+                </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-1">
