@@ -120,6 +120,22 @@ class User extends Authenticatable
         return $this->hasMany(User::class, 'manager_id');
     }
 
+    // Все подчинённые по всей организационной вертикали (прямые и косвенные, на любую глубину),
+    // не только первый уровень — используется везде, где руководитель должен видеть свою команду
+    // целиком (дашборд, отчёты, список сотрудников, поиск), а не только непосредственных подчинённых.
+    public function subordinateIds(): \Illuminate\Support\Collection
+    {
+        return collect(\Illuminate\Support\Facades\DB::select(
+            'WITH RECURSIVE subordinates AS (
+                SELECT id FROM users WHERE manager_id = ?
+                UNION ALL
+                SELECT u.id FROM users u INNER JOIN subordinates s ON u.manager_id = s.id
+            )
+            SELECT id FROM subordinates',
+            [$this->id]
+        ))->pluck('id');
+    }
+
     public function trainingAssignments()
     {
         return $this->hasMany(TrainingAssignment::class);

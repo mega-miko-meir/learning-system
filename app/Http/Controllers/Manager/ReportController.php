@@ -14,7 +14,7 @@ class ReportController extends Controller
     public function index()
     {
         $team = User::with(['department', 'position'])
-            ->where('manager_id', Auth::id())
+            ->whereIn('id', Auth::user()->subordinateIds())
             ->active()
             ->get();
 
@@ -42,7 +42,7 @@ class ReportController extends Controller
         $manager = Auth::user();
 
         $team = User::with(['department', 'position'])
-            ->where('manager_id', $manager->id)
+            ->whereIn('id', $manager->subordinateIds())
             ->active()
             ->orderBy('last_name')
             ->get();

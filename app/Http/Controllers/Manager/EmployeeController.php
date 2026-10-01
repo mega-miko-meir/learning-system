@@ -15,7 +15,7 @@ class EmployeeController extends Controller
     public function index(Request $request)
     {
         $employees = User::with(['department', 'position'])
-            ->where('manager_id', Auth::id())
+            ->whereIn('id', Auth::user()->subordinateIds())
             ->active()
             ->when($request->search, fn($q, $s) =>
                 $q->where(fn($q) =>
@@ -38,7 +38,7 @@ class EmployeeController extends Controller
 
     public function show(User $user)
     {
-        abort_if($user->manager_id !== Auth::id(), 403);
+        abort_unless(Auth::user()->subordinateIds()->contains($user->id), 403);
 
         $user->load(['department', 'position']);
 
@@ -86,7 +86,7 @@ class EmployeeController extends Controller
 
     public function pdf(User $user)
     {
-        abort_if($user->manager_id !== Auth::id(), 403);
+        abort_unless(Auth::user()->subordinateIds()->contains($user->id), 403);
 
         $user->load(['department', 'position', 'manager']);
 

@@ -13,7 +13,7 @@ class DashboardController extends Controller
     public function index()
     {
         $manager = Auth::user();
-        $teamIds = User::where('manager_id', $manager->id)->active()->pluck('id');
+        $teamIds = User::whereIn('id', $manager->subordinateIds())->active()->pluck('id');
 
         $stats = [
             'team_size' => $teamIds->count(),

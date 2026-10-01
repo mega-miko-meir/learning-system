@@ -54,7 +54,7 @@ class SearchController extends Controller
 
         match ($user->role) {
             'admin', 'hr_admin' => $query->where('role', '!=', 'superadmin'),
-            'manager'           => $query->where('manager_id', $user->id),
+            'manager'           => $query->whereIn('id', $user->subordinateIds()),
             default             => null,
         };
 
