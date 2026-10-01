@@ -24,17 +24,33 @@ class ReportController extends Controller
             $overdue   = TrainingAssignment::where('user_id', $employee->id)->overdue()->count();
 
             return [
-                'id'        => $employee->id,
-                'full_name' => $employee->full_name,
-                'position'  => $employee->position?->name,
-                'total'     => $total,
-                'completed' => $completed,
-                'overdue'   => $overdue,
-                'percent'   => $total > 0 ? round($completed / $total * 100) : 0,
+                'id'         => $employee->id,
+                'full_name'  => $employee->full_name,
+                'department' => $employee->department?->name ?? 'Без отдела',
+                'position'   => $employee->position?->name,
+                'total'      => $total,
+                'completed'  => $completed,
+                'overdue'    => $overdue,
+                'percent'    => $total > 0 ? round($completed / $total * 100) : 0,
             ];
         });
 
-        return Inertia::render('Manager/Reports/Index', compact('report'));
+        // Сводка по отделам — та же структура, что на странице «Отчёты» у admin (Admin/Reports/Index),
+        // только посчитана по всей организационной вертикали текущего руководителя, а не по всем сотрудникам.
+        $byDepartment = $report->groupBy('department')->map(function ($employees, $name) {
+            $total     = $employees->sum('total');
+            $completed = $employees->sum('completed');
+
+            return [
+                'name'      => $name,
+                'employees' => $employees->count(),
+                'total'     => $total,
+                'completed' => $completed,
+                'percent'   => $total > 0 ? round($completed / $total * 100) : 0,
+            ];
+        })->sortBy('name')->values();
+
+        return Inertia::render('Manager/Reports/Index', compact('report', 'byDepartment'));
     }
 
     public function teamPdf()
@@ -77,8 +93,13 @@ class ReportController extends Controller
         $teamOverdue   = $employees->sum('overdue');
         $teamPercent   = $teamTotal > 0 ? round($teamCompleted / $teamTotal * 100) : 0;
 
+        // Группировка по отделам для PDF — тот же принцип, что и на странице отчёта.
+        $employeesByDepartment = $employees
+            ->groupBy(fn ($e) => $e['user']->department?->name ?? 'Без отдела')
+            ->sortKeys();
+
         $pdf = Pdf::loadView('reports.team_pdf', compact(
-            'manager', 'employees', 'teamTotal', 'teamCompleted', 'teamOverdue', 'teamPercent'
+            'manager', 'employees', 'employeesByDepartment', 'teamTotal', 'teamCompleted', 'teamOverdue', 'teamPercent'
         ))->setPaper('a4', 'portrait');
 
         $filename = 'team_report_' . now()->format('Ymd') . '.pdf';

@@ -73,9 +73,11 @@ table.data tr:nth-child(even) td { background: #f8fafc; }
     </table>
 </div>
 
-{{-- Сводная таблица по сотрудникам --}}
+{{-- Сводная таблица по сотрудникам, сгруппированная по отделам —
+     тот же принцип, что в отчёте admin (блок «Прогресс по отделам») --}}
+@foreach($employeesByDepartment as $deptName => $deptEmployees)
 <div class="section">
-    <div class="section-title">Прогресс по сотрудникам</div>
+    <div class="section-title">{{ $deptName }} ({{ $deptEmployees->count() }} чел.)</div>
     <table class="data">
         <thead>
             <tr>
@@ -88,7 +90,7 @@ table.data tr:nth-child(even) td { background: #f8fafc; }
             </tr>
         </thead>
         <tbody>
-            @foreach($employees as $e)
+            @foreach($deptEmployees as $e)
             <tr>
                 <td style="font-weight:bold">{{ $e['user']->full_name }}</td>
                 <td>{{ $e['user']->position?->name ?? '—' }}</td>
@@ -101,12 +103,16 @@ table.data tr:nth-child(even) td { background: #f8fafc; }
         </tbody>
     </table>
 </div>
+@endforeach
 
-{{-- Детализация по каждому сотруднику --}}
+{{-- Детализация по каждому сотруднику, тоже по отделам --}}
 <div class="section">
     <div class="section-title">Детализация по сотрудникам</div>
 
-    @foreach($employees as $e)
+    @foreach($employeesByDepartment as $deptName => $deptEmployees)
+    <div style="font-size:11px;font-weight:bold;color:#64748b;margin:14px 0 8px;text-transform:uppercase">{{ $deptName }}</div>
+
+    @foreach($deptEmployees as $e)
     <div class="employee-block">
         <div class="employee-name">{{ $e['user']->full_name }}</div>
         <div class="employee-meta">
@@ -153,6 +159,7 @@ table.data tr:nth-child(even) td { background: #f8fafc; }
         <div style="font-size:10px;color:#94a3b8;padding:6px 0">Назначений нет</div>
         @endif
     </div>
+    @endforeach
     @endforeach
 </div>
 

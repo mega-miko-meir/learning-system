@@ -1,11 +1,22 @@
 import { Head, Link } from "@inertiajs/react";
 import AppLayout from "../../../Layouts/AppLayout";
 
-export default function ManagerReports({ report }) {
+function progressColor(percent) {
+    return percent >= 80 ? "bg-green-500" : percent >= 50 ? "bg-blue-500" : "bg-yellow-400";
+}
+
+export default function ManagerReports({ report, byDepartment }) {
     const total     = report.length;
     const allTotal  = report.reduce((s, e) => s + e.total, 0);
     const allDone   = report.reduce((s, e) => s + e.completed, 0);
     const avgPct    = total > 0 ? Math.round(allDone / Math.max(allTotal, 1) * 100) : 0;
+
+    const byDept = report.reduce((acc, e) => {
+        const key = e.department ?? "Без отдела";
+        acc[key] = acc[key] ?? [];
+        acc[key].push(e);
+        return acc;
+    }, {});
 
     return (
         <AppLayout title="Отчёт по команде">
@@ -39,53 +50,96 @@ export default function ManagerReports({ report }) {
                 </div>
             </div>
 
-            <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-                <table className="w-full text-sm">
-                    <thead className="bg-gray-50 border-b border-gray-100">
-                        <tr>
-                            <th className="text-left px-4 py-3 font-medium text-gray-600">Сотрудник</th>
-                            <th className="text-left px-4 py-3 font-medium text-gray-600">Должность</th>
-                            <th className="text-left px-4 py-3 font-medium text-gray-600">Выполнено</th>
-                            <th className="text-left px-4 py-3 font-medium text-gray-600">Просрочено</th>
-                            <th className="text-left px-4 py-3 font-medium text-gray-600">Прогресс</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                        {report.length === 0 ? (
-                            <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">Нет данных</td></tr>
-                        ) : report.map((emp) => (
-                            <tr key={emp.id} className="hover:bg-gray-50">
-                                <td className="px-4 py-3 font-medium text-gray-900">
-                                    <Link href={route("manager.employees.show", emp.id)} className="hover:underline">
-                                        {emp.full_name}
-                                    </Link>
-                                </td>
-                                <td className="px-4 py-3 text-gray-500 text-xs">{emp.position ?? "—"}</td>
-                                <td className="px-4 py-3 text-green-600">{emp.completed}/{emp.total}</td>
-                                <td className="px-4 py-3">
-                                    {emp.overdue > 0 ? (
-                                        <span className="text-red-500">{emp.overdue}</span>
-                                    ) : <span className="text-gray-300">0</span>}
-                                </td>
-                                <td className="px-4 py-3 w-36">
-                                    <div className="flex items-center gap-2">
-                                        <div className="flex-1 h-1.5 bg-gray-100 rounded-full">
-                                            <div
-                                                className={`h-full rounded-full ${
-                                                    emp.percent >= 80 ? "bg-green-500" :
-                                                    emp.percent >= 50 ? "bg-blue-500"  : "bg-yellow-400"
-                                                }`}
-                                                style={{ width: `${emp.percent}%` }}
-                                            />
-                                        </div>
-                                        <span className="text-xs text-gray-500 w-8 text-right">{emp.percent}%</span>
+            {/* Прогресс по отделам — тот же блок, что в отчёте у admin */}
+            <div className="bg-white rounded-xl border border-gray-100 p-5 mb-6">
+                <h2 className="text-sm font-semibold text-gray-700 mb-5">Прогресс по отделам</h2>
+                {byDepartment.length === 0 ? (
+                    <p className="text-sm text-gray-400">Нет данных</p>
+                ) : (
+                    <div className="space-y-5">
+                        {byDepartment.map((dept) => (
+                            <div key={dept.name}>
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-sm font-medium text-gray-700">{dept.name}</span>
+                                        <span className="text-xs text-gray-400">{dept.employees} чел.</span>
                                     </div>
-                                </td>
-                            </tr>
+                                    <span className="text-sm font-semibold text-gray-700">
+                                        {dept.percent}%
+                                        <span className="text-xs text-gray-400 font-normal ml-1">
+                                            ({dept.completed}/{dept.total})
+                                        </span>
+                                    </span>
+                                </div>
+                                <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                                    <div
+                                        className={`h-full rounded-full ${progressColor(dept.percent)}`}
+                                        style={{ width: `${dept.percent}%` }}
+                                    />
+                                </div>
+                            </div>
                         ))}
-                    </tbody>
-                </table>
+                    </div>
+                )}
             </div>
+
+            {/* Сотрудники — сгруппированы по отделам (секциями) */}
+            {report.length === 0 ? (
+                <div className="bg-white rounded-xl border border-gray-100 p-8 text-center text-gray-400">
+                    Нет данных
+                </div>
+            ) : (
+                Object.entries(byDept).map(([deptName, employees]) => (
+                    <div key={deptName} className="bg-white rounded-xl border border-gray-100 overflow-hidden mb-6">
+                        <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
+                            <h3 className="text-sm font-semibold text-gray-700">
+                                {deptName}
+                                <span className="ml-2 text-xs font-normal text-gray-400">{employees.length} чел.</span>
+                            </h3>
+                        </div>
+                        <table className="w-full text-sm">
+                            <thead className="border-b border-gray-100">
+                                <tr>
+                                    <th className="text-left px-4 py-3 font-medium text-gray-600">Сотрудник</th>
+                                    <th className="text-left px-4 py-3 font-medium text-gray-600">Должность</th>
+                                    <th className="text-left px-4 py-3 font-medium text-gray-600">Выполнено</th>
+                                    <th className="text-left px-4 py-3 font-medium text-gray-600">Просрочено</th>
+                                    <th className="text-left px-4 py-3 font-medium text-gray-600">Прогресс</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {employees.map((emp) => (
+                                    <tr key={emp.id} className="hover:bg-gray-50">
+                                        <td className="px-4 py-3 font-medium text-gray-900">
+                                            <Link href={route("manager.employees.show", emp.id)} className="hover:underline">
+                                                {emp.full_name}
+                                            </Link>
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-500 text-xs">{emp.position ?? "—"}</td>
+                                        <td className="px-4 py-3 text-green-600">{emp.completed}/{emp.total}</td>
+                                        <td className="px-4 py-3">
+                                            {emp.overdue > 0 ? (
+                                                <span className="text-red-500">{emp.overdue}</span>
+                                            ) : <span className="text-gray-300">0</span>}
+                                        </td>
+                                        <td className="px-4 py-3 w-36">
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex-1 h-1.5 bg-gray-100 rounded-full">
+                                                    <div
+                                                        className={`h-full rounded-full ${progressColor(emp.percent)}`}
+                                                        style={{ width: `${emp.percent}%` }}
+                                                    />
+                                                </div>
+                                                <span className="text-xs text-gray-500 w-8 text-right">{emp.percent}%</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                ))
+            )}
         </AppLayout>
     );
 }
