@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\TrainingAssignment;
 use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
@@ -24,25 +25,28 @@ class ReportController extends Controller
             $overdue   = TrainingAssignment::where('user_id', $employee->id)->overdue()->count();
 
             return [
-                'id'         => $employee->id,
-                'full_name'  => $employee->full_name,
-                'department' => $employee->department?->name ?? 'Без отдела',
-                'position'   => $employee->position?->name,
-                'total'      => $total,
-                'completed'  => $completed,
-                'overdue'    => $overdue,
-                'percent'    => $total > 0 ? round($completed / $total * 100) : 0,
+                'id'            => $employee->id,
+                'full_name'     => $employee->full_name,
+                'department_id' => $employee->department_id,
+                'department'    => $employee->department?->name ?? 'Без отдела',
+                'position'      => $employee->position?->name,
+                'total'         => $total,
+                'completed'     => $completed,
+                'overdue'       => $overdue,
+                'percent'       => $total > 0 ? round($completed / $total * 100) : 0,
             ];
         });
 
         // Сводка по отделам — та же структура, что на странице «Отчёты» у admin (Admin/Reports/Index),
         // только посчитана по всей организационной вертикали текущего руководителя, а не по всем сотрудникам.
-        $byDepartment = $report->groupBy('department')->map(function ($employees, $name) {
+        // department_id нужен фронту, чтобы предложить выбор отдела(ов) при выгрузке PDF.
+        $byDepartment = $report->groupBy('department_id')->map(function ($employees) {
             $total     = $employees->sum('total');
             $completed = $employees->sum('completed');
 
             return [
-                'name'      => $name,
+                'id'        => $employees->first()['department_id'],
+                'name'      => $employees->first()['department'],
                 'employees' => $employees->count(),
                 'total'     => $total,
                 'completed' => $completed,
@@ -53,13 +57,26 @@ class ReportController extends Controller
         return Inertia::render('Manager/Reports/Index', compact('report', 'byDepartment'));
     }
 
-    public function teamPdf()
+    public function teamPdf(Request $request)
     {
         $manager = Auth::user();
+
+        // Выбор отдела(ов) для выгрузки — по умолчанию (ничего не выбрано) вся команда, как раньше.
+        $departmentIds = array_filter(array_map('intval', (array) $request->input('department_ids', [])));
+        $includeNoDepartment = $request->boolean('no_department');
+        $hasFilter = $departmentIds !== [] || $includeNoDepartment;
 
         $team = User::with(['department', 'position'])
             ->whereIn('id', $manager->subordinateIds())
             ->active()
+            ->when($hasFilter, fn ($q) => $q->where(function ($q) use ($departmentIds, $includeNoDepartment) {
+                if ($departmentIds !== []) {
+                    $q->orWhereIn('department_id', $departmentIds);
+                }
+                if ($includeNoDepartment) {
+                    $q->orWhereNull('department_id');
+                }
+            }))
             ->orderBy('last_name')
             ->get();
 
