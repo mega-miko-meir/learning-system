@@ -106,15 +106,32 @@ export default function AssignmentShow({ assignment }) {
         setSkipping(true);
         try {
             await window.axios.post(route("employee.assignments.heartbeat", id), { seconds: required_seconds });
-            sessionStorage.setItem(sessionKey(id), String(required_seconds));
-            spentRef.current = required_seconds;
-            setSpent(required_seconds);
-            if (has_test) {
-                router.visit(route("employee.test.show", id));
+        } catch (err) {
+            if (err?.response?.status === 419) {
+                // CSRF-токен устарел (долгое чтение без активности) — тот же баг 419, что и в тесте:
+                // обновляем сессию через /ping и пробуем один раз автоматически
+                try {
+                    await window.axios.get(route("ping"));
+                    await window.axios.post(route("employee.assignments.heartbeat", id), { seconds: required_seconds });
+                } catch {
+                    setSkipping(false);
+                    alert("Сессия устарела. Обновите страницу и попробуйте снова.");
+                    return;
+                }
+            } else {
+                setSkipping(false);
+                alert("Не удалось отметить документ прочитанным. Проверьте соединение и попробуйте ещё раз.");
+                return;
             }
-        } finally {
-            setSkipping(false);
         }
+
+        sessionStorage.setItem(sessionKey(id), String(required_seconds));
+        spentRef.current = required_seconds;
+        setSpent(required_seconds);
+        if (has_test) {
+            router.visit(route("employee.test.show", id));
+        }
+        setSkipping(false);
     }
 
     return (
