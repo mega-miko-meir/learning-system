@@ -151,7 +151,7 @@ class UserController extends Controller
     {
         $user->load(['department', 'position', 'manager']);
 
-        $assignments = TrainingAssignment::with('document')
+        $assignments = TrainingAssignment::with('document.test')
             ->where('user_id', $user->id)
             ->latest()
             ->get()
@@ -162,6 +162,7 @@ class UserController extends Controller
                 'status'       => $a->status,
                 'due_date'     => $a->due_date?->format('d.m.Y'),
                 'completed_at' => $a->completed_at?->format('d.m.Y'),
+                'has_test'     => $a->document->test !== null,
             ]);
 
         return Inertia::render('HR/Users/Show', [

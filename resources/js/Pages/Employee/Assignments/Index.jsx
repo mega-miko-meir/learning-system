@@ -1,5 +1,6 @@
 import { Head, Link, router } from "@inertiajs/react";
 import AppLayout from "../../../Layouts/AppLayout";
+import TestBadge from "../../../Components/TestBadge";
 
 const STATUS_MAP = {
     pending:     { label: "Ожидает",    cls: "bg-yellow-50 text-yellow-700 border-yellow-200" },
@@ -81,6 +82,7 @@ export default function AssignmentsIndex({ assignments }) {
                                         {item.completed_at && ` · завершено ${item.completed_at}`}
                                     </p>
                                 </div>
+                                <TestBadge hasTest={item.has_test} />
                                 <span className={`text-xs px-2.5 py-1 rounded-full border ${s.cls}`}>
                                     {s.label}
                                 </span>

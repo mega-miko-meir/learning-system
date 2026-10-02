@@ -46,7 +46,7 @@ class DashboardController extends Controller
             ->values();
 
         // Последние активности
-        $recent = TrainingAssignment::with(['user', 'document'])
+        $recent = TrainingAssignment::with(['user', 'document.test'])
             ->whereIn('status', ['completed', 'failed'])
             ->latest('updated_at')
             ->limit(10)
@@ -57,6 +57,7 @@ class DashboardController extends Controller
                 'document'  => $a->document->display_name,
                 'status'    => $a->status,
                 'updated_at'=> $a->updated_at->format('d.m.Y H:i'),
+                'has_test'  => $a->document->test !== null,
             ]);
 
         return Inertia::render('Admin/Dashboard', compact('stats', 'departments', 'recent'));

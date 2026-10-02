@@ -2,6 +2,7 @@ import { Head, Link, router, useForm } from "@inertiajs/react";
 import { useEffect, useState } from "react";
 import AppLayout from "../../../Layouts/AppLayout";
 import CreateAssignmentModal from "../../../Components/CreateAssignmentModal";
+import TestBadge from "../../../Components/TestBadge";
 import { useFlash } from "../../../hooks/useAuth";
 
 const STATUS_MAP = {
@@ -420,9 +421,9 @@ export default function UserShow({ employee, assignments, documents }) {
                             Назначений нет
                         </div>
                     ) : assignments.map((a) => {
-                        const s       = STATUS_MAP[a.status] ?? { label: a.status, cls: "bg-gray-100 text-gray-500" };
-                        const hasTest = a.attempts?.length > 0;
-                        const isOpen  = openAttempts[a.id];
+                        const s           = STATUS_MAP[a.status] ?? { label: a.status, cls: "bg-gray-100 text-gray-500" };
+                        const hasAttempts = a.attempts?.length > 0;
+                        const isOpen      = openAttempts[a.id];
 
                         return (
                             <div key={a.id} className="bg-white rounded-xl border border-gray-100 p-4">
@@ -431,6 +432,7 @@ export default function UserShow({ employee, assignments, documents }) {
                                         <p className="text-sm font-medium text-gray-800 truncate">{a.document}</p>
                                         <div className="flex items-center gap-2 mt-1 flex-wrap">
                                             <span className={`text-xs px-2 py-0.5 rounded-full ${s.cls}`}>{s.label}</span>
+                                            <TestBadge hasTest={a.has_test} />
                                             <span className="text-xs text-gray-400">{a.type}</span>
                                             {a.best_score != null && (
                                                 <span className="text-xs text-gray-500">
@@ -443,7 +445,7 @@ export default function UserShow({ employee, assignments, documents }) {
                                         </div>
                                     </div>
 
-                                    {hasTest && (
+                                    {hasAttempts && (
                                         <button
                                             onClick={() => toggleAttempts(a.id)}
                                             className="shrink-0 flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 border border-blue-200 hover:bg-blue-50 px-2 py-1 rounded-lg transition-colors"

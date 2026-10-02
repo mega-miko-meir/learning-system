@@ -19,7 +19,7 @@ class DashboardController extends Controller
             'overdue'   => TrainingAssignment::where('user_id', $user->id)->overdue()->count(),
         ];
 
-        $upcoming = TrainingAssignment::with('document')
+        $upcoming = TrainingAssignment::with('document.test')
             ->where('user_id', $user->id)
             ->whereIn('status', ['pending', 'in_progress'])
             ->orderBy('due_date')
@@ -31,6 +31,7 @@ class DashboardController extends Controller
                 'type'     => $a->training_type,
                 'status'   => $a->status,
                 'due_date' => $a->due_date?->format('d.m.Y'),
+                'has_test' => $a->document->test !== null,
             ]);
 
         return Inertia::render('Employee/Dashboard', compact('stats', 'upcoming'));

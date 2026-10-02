@@ -1,5 +1,6 @@
 import { Head } from "@inertiajs/react";
 import AppLayout from "../../Layouts/AppLayout";
+import TestBadge from "../../Components/TestBadge";
 
 function StatCard({ label, value, color = "blue" }) {
     const colors = {
@@ -89,6 +90,7 @@ export default function Dashboard({ stats, departments, recent }) {
                                         </p>
                                         <p className="text-gray-400 text-xs">{item.updated_at}</p>
                                     </div>
+                                    <TestBadge hasTest={item.has_test} />
                                     <span
                                         className={`flex-shrink-0 text-xs px-2 py-0.5 rounded-full ${
                                             item.status === "completed"

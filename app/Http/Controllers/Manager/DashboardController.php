@@ -22,7 +22,7 @@ class DashboardController extends Controller
             'overdue'   => TrainingAssignment::whereIn('user_id', $teamIds)->overdue()->count(),
         ];
 
-        $recentActivity = TrainingAssignment::with(['user', 'document'])
+        $recentActivity = TrainingAssignment::with(['user', 'document.test'])
             ->whereIn('user_id', $teamIds)
             ->whereIn('status', ['completed', 'failed'])
             ->latest('updated_at')
@@ -34,6 +34,7 @@ class DashboardController extends Controller
                 'document'   => $a->document->display_name,
                 'status'     => $a->status,
                 'updated_at' => $a->updated_at->format('d.m.Y H:i'),
+                'has_test'   => $a->document->test !== null,
             ]);
 
         return Inertia::render('Manager/Dashboard', compact('stats', 'recentActivity'));

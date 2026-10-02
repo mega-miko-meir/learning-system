@@ -2,6 +2,7 @@ import { Head, Link, router } from "@inertiajs/react";
 import { useEffect, useState } from "react";
 import AppLayout from "../../../Layouts/AppLayout";
 import CreateAssignmentModal from "../../../Components/CreateAssignmentModal";
+import TestBadge from "../../../Components/TestBadge";
 import { useFlash } from "../../../hooks/useAuth";
 
 const STATUS_MAP = {
@@ -292,6 +293,7 @@ export default function HRUserShow({ employee, assignments, documents }) {
                                 <tr>
                                     <th className="text-left pb-2 font-medium text-gray-500">Документ</th>
                                     <th className="text-left pb-2 font-medium text-gray-500">Вид</th>
+                                    <th className="text-left pb-2 font-medium text-gray-500">Тест</th>
                                     <th className="text-left pb-2 font-medium text-gray-500">Статус</th>
                                     <th className="text-left pb-2 font-medium text-gray-500">Срок</th>
                                 </tr>
@@ -304,6 +306,9 @@ export default function HRUserShow({ employee, assignments, documents }) {
                                             <td className="py-2.5 pr-3 text-gray-800">{a.document}</td>
                                             <td className="py-2.5 pr-3 text-gray-400 text-xs">
                                                 {TRAINING_TYPES.find((t) => t.value === a.type)?.label ?? a.type}
+                                            </td>
+                                            <td className="py-2.5 pr-3">
+                                                <TestBadge hasTest={a.has_test} />
                                             </td>
                                             <td className="py-2.5 pr-3">
                                                 <span className={`text-xs px-2 py-0.5 rounded-full ${s.cls}`}>{s.label}</span>

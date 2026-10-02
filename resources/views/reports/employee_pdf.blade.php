@@ -101,6 +101,7 @@ table.data tr:nth-child(even) td { background: #f8fafc; }
                 <th>Документ</th>
                 <th>Версия</th>
                 <th>Вид</th>
+                <th>Тест</th>
                 <th>Статус</th>
                 <th>Срок</th>
                 <th>Завершено</th>
@@ -113,6 +114,9 @@ table.data tr:nth-child(even) td { background: #f8fafc; }
                 <td>{{ $a->document->display_name }}</td>
                 <td>v{{ $a->document->version }}</td>
                 <td>{{ ['primary'=>'Первичное','periodic'=>'Периодическое','unplanned'=>'Внеплановое','special'=>'Специальное'][$a->training_type] ?? $a->training_type }}</td>
+                <td>
+                    <span class="badge {{ $a->document->test ? 'badge-green' : 'badge-gray' }}">{{ $a->document->test ? 'С тестом' : 'Без теста' }}</span>
+                </td>
                 <td>
                     @php $sc = ['completed'=>'badge-green','failed'=>'badge-red','pending'=>'badge-yellow','in_progress'=>'badge-yellow'][$a->status] ?? 'badge-gray' @endphp
                     @php $sl = ['completed'=>'Выполнено','failed'=>'Не пройдено','pending'=>'Ожидает','in_progress'=>'В процессе','expired'=>'Просрочено'][$a->status] ?? $a->status @endphp

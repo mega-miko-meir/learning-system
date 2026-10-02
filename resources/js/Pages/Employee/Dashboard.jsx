@@ -1,6 +1,7 @@
 import { Head, Link } from "@inertiajs/react";
 import { usePage } from "@inertiajs/react";
 import AppLayout from "../../Layouts/AppLayout";
+import TestBadge from "../../Components/TestBadge";
 
 const STATUS_LABELS = {
     pending: { label: "Ожидает", cls: "bg-yellow-50 text-yellow-700" },
@@ -83,6 +84,7 @@ export default function Dashboard({ stats, upcoming }) {
                                             {item.due_date && ` · до ${item.due_date}`}
                                         </p>
                                     </div>
+                                    <TestBadge hasTest={item.has_test} />
                                     <span
                                         className={`flex-shrink-0 text-xs px-2 py-0.5 rounded-full ${s.cls}`}
                                     >

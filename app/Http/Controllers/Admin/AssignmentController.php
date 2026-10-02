@@ -23,7 +23,7 @@ class AssignmentController extends Controller
     {
         $activeOnly = $request->boolean('active_only', true);
 
-        $assignments = TrainingAssignment::with(['user', 'document'])
+        $assignments = TrainingAssignment::with(['user', 'document.test'])
             ->when($request->search, fn ($q, $s) => $q->whereHas('user', fn ($u) => $u->where(
                 fn ($u) => $u->where('last_name', 'like', "%$s%")
                     ->orWhere('first_name', 'like', "%$s%")
@@ -49,6 +49,7 @@ class AssignmentController extends Controller
                 'due_date_raw' => $a->due_date?->format('Y-m-d'),
                 'completed_at' => $a->completed_at?->format('d.m.Y'),
                 'reading_minutes' => $a->required_reading_minutes,
+                'has_test' => $a->document->test !== null,
             ]);
 
         $departments = Department::active()->orderBy('name')->get(['id', 'name']);

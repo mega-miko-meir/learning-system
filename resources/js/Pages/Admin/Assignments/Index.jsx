@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import AppLayout from "../../../Layouts/AppLayout";
 import Pagination from "../../../Components/Pagination";
 import { CheckboxList, PickerModal } from "../../../Components/CheckboxPicker";
+import TestBadge from "../../../Components/TestBadge";
 
 const STATUS_MAP = {
     pending:     "Ожидает",
@@ -424,16 +425,17 @@ export default function AssignmentsIndex({ assignments, departments, positions, 
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Сотрудник</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Документ</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Вид</th>
+                            <th className="text-left px-4 py-3 font-medium text-gray-600">Тест</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Статус</th>
                             <th className="text-left px-4 py-3 font-medium text-gray-600">Срок</th>
-                            <th className="text-left px-4 py-3 font-medium text-gray-600">Сдача теста</th>
+                            <th className="text-left px-4 py-3 font-medium text-gray-600">Завершено</th>
                             <th className="text-right px-4 py-3 font-medium text-gray-600">Действия</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                         {assignments.data.length === 0 ? (
                             <tr>
-                                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
+                                <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
                                     {params.search ? "Сотрудник не найден" : "Назначений нет"}
                                 </td>
                             </tr>
@@ -461,6 +463,9 @@ export default function AssignmentsIndex({ assignments, departments, positions, 
                                     </td>
                                     <td className="px-4 py-3 text-gray-400 text-xs">
                                         {TRAINING_TYPES.find((t) => t.value === a.type)?.label ?? a.type}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <TestBadge hasTest={a.has_test} />
                                     </td>
                                     <td className="px-4 py-3">
                                         <span className={`text-xs px-2 py-0.5 rounded-full ${

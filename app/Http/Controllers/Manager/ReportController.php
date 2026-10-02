@@ -81,7 +81,7 @@ class ReportController extends Controller
             ->get();
 
         $employees = $team->map(function ($emp) {
-            $assignments = TrainingAssignment::with(['document', 'testAttempts'])
+            $assignments = TrainingAssignment::with(['document.test', 'testAttempts'])
                 ->where('user_id', $emp->id)
                 ->latest()
                 ->get();

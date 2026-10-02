@@ -163,7 +163,7 @@ class UserController extends Controller
         $user->load(['department', 'position', 'manager']);
 
         $assignments = TrainingAssignment::with([
-            'document',
+            'document.test',
             'testAttempts.attemptAnswers.question',
             'testAttempts.attemptAnswers.answer',
         ])
@@ -177,6 +177,7 @@ class UserController extends Controller
                 'status' => $a->status,
                 'due_date' => $a->due_date?->format('d.m.Y'),
                 'completed_at' => $a->completed_at?->format('d.m.Y'),
+                'has_test' => $a->document->test !== null,
                 'best_score' => $a->testAttempts->max('score_percentage'),
                 'attempts' => $a->testAttempts->map(fn ($att) => [
                     'id' => $att->id,

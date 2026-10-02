@@ -12,7 +12,7 @@ class AssignmentController extends Controller
 {
     public function index(Request $request)
     {
-        $assignments = TrainingAssignment::with('document')
+        $assignments = TrainingAssignment::with('document.test')
             ->where('user_id', Auth::id())
             ->when($request->status, fn($q, $s) => $q->where('status', $s))
             ->orderBy('due_date')
@@ -25,6 +25,7 @@ class AssignmentController extends Controller
                 'status'       => $a->status,
                 'due_date'     => $a->due_date?->format('d.m.Y'),
                 'completed_at' => $a->completed_at?->format('d.m.Y'),
+                'has_test'     => $a->document->test !== null,
             ]);
 
         return Inertia::render('Employee/Assignments/Index', compact('assignments'));
@@ -94,11 +95,27 @@ class AssignmentController extends Controller
         $seconds = min(max($seconds, 0), 7200); // не больше 2 часов
 
         if ($seconds > $assignment->time_spent_seconds) {
-            $assignment->update(['time_spent_seconds' => $seconds]);
+            $assignment->time_spent_seconds = $seconds;
         }
+
+        // У документа без теста экзамен не предусмотрен — как только время чтения набрано
+        // (обычным отсчётом или кнопкой «Я всё прочитал(а)», которая шлёт сюда же полное
+        // required_seconds), обучение завершается сразу, без него статус навечно остался бы
+        // in_progress (переходить было бы больше некуда).
+        if (in_array($assignment->status, ['pending', 'in_progress'], true)) {
+            $requiredSeconds = ($assignment->required_reading_minutes ?? 10) * 60;
+
+            if ($assignment->time_spent_seconds >= $requiredSeconds && ! $assignment->document->test) {
+                $assignment->status       = 'completed';
+                $assignment->completed_at = now();
+            }
+        }
+
+        $assignment->save();
 
         return response()->json([
             'ok'                 => true,
+            'status'             => $assignment->status,
             'time_spent_seconds' => $assignment->time_spent_seconds,
         ]);
     }

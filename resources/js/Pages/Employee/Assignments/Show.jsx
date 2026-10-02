@@ -95,8 +95,21 @@ export default function AssignmentShow({ assignment }) {
     }, []);
 
     function sendHeartbeat(seconds) {
-        window.axios.post(route("employee.assignments.heartbeat", id), { seconds });
+        window.axios.post(route("employee.assignments.heartbeat", id), { seconds }).catch(() => {});
     }
+
+    // У документа без теста сдавать нечего — как только время чтения набрано (обычным отсчётом
+    // или кнопкой «Я всё прочитал(а)»), сервер (см. AssignmentController::heartbeat) сам переводит
+    // назначение в «Выполнено». Здесь только подтягиваем актуальный статус, чтобы бейдж
+    // «Обучение завершено» появился сразу, а не после ручного обновления страницы.
+    const completingRef = useRef(false);
+    useEffect(() => {
+        if (has_test || isReadonly || !unlocked || completingRef.current) return;
+        completingRef.current = true;
+        window.axios.post(route("employee.assignments.heartbeat", id), { seconds: spentRef.current })
+            .catch(() => {})
+            .finally(() => router.reload({ only: ["assignment"] }));
+    }, [has_test, isReadonly, unlocked, id]);
 
     // «Я всё прочитал(а)» — принудительно завершает таймер чтения досрочно: фиксирует на сервере
     // полное требуемое время (та же логика, что уже применяется при обычном истечении таймера,
@@ -219,7 +232,8 @@ export default function AssignmentShow({ assignment }) {
                     </svg>
                     <p className="text-sm font-medium text-gray-500">Просмотр документа закрыт</p>
                     <p className="text-xs text-gray-400 mt-1">
-                        {unlocked && !isReadonly  && "Время изучения истекло. Переходите к тесту."}
+                        {unlocked && !isReadonly && has_test  && "Время изучения истекло. Переходите к тесту."}
+                        {unlocked && !isReadonly && !has_test && "Завершаем обучение…"}
                         {status === "completed"   && "Обучение завершено — доступ к документу закрыт."}
                         {status === "failed"      && "Попытки исчерпаны — обратитесь к администратору."}
                         {status === "expired"     && "Срок обучения истёк."}

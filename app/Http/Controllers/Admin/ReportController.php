@@ -126,7 +126,7 @@ class ReportController extends Controller
     {
         $user->load(['department', 'position', 'manager']);
 
-        $assignments = TrainingAssignment::with(['document', 'testAttempts'])
+        $assignments = TrainingAssignment::with(['document.test', 'testAttempts'])
             ->where('user_id', $user->id)
             ->latest()
             ->get();
@@ -182,7 +182,7 @@ class ReportController extends Controller
             ->get();
 
         $employees = $staff->map(function ($emp) use ($dateFrom, $dateTo) {
-            $assignments = TrainingAssignment::with(['document', 'testAttempts'])
+            $assignments = TrainingAssignment::with(['document.test', 'testAttempts'])
                 ->where('user_id', $emp->id)
                 ->when($dateFrom, fn($q) => $q->whereDate('created_at', '>=', $dateFrom))
                 ->when($dateTo, fn($q) => $q->whereDate('created_at', '<=', $dateTo))
