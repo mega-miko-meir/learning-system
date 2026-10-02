@@ -32,7 +32,11 @@ Route::middleware(['auth', 'user.active'])->group(function () {
     Route::post('/change-password', [AuthController::class, 'changePassword'])->name('password.change.post');
 
     // ─── Сотрудник ────────────────────────────────────────────
-    Route::middleware('role:employee,manager')->prefix('dashboard')->name('employee.')->group(function () {
+    // admin тоже допущен сюда: администратор может одновременно быть штатным сотрудником
+    // с собственной должностью и обязан проходить назначенное ему обучение наравне с другими
+    // (см. assignTrainingByPosition — назначения по матрице уже создаются ему независимо от роли,
+    // не хватало только доступа к самим страницам прохождения).
+    Route::middleware('role:employee,manager,admin')->prefix('dashboard')->name('employee.')->group(function () {
         Route::get('/', [\App\Http\Controllers\Employee\DashboardController::class, 'index'])->name('dashboard');
         Route::get('/assignments', [\App\Http\Controllers\Employee\AssignmentController::class, 'index'])->name('assignments');
         Route::get('/assignments/{assignment}', [\App\Http\Controllers\Employee\AssignmentController::class, 'show'])->name('assignments.show');

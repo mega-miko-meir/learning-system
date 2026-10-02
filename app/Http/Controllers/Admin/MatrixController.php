@@ -198,38 +198,70 @@ class MatrixController extends Controller
         return back()->with('success', 'Запись удалена из матрицы.');
     }
 
-    // Применить матрицу ко всем текущим активным сотрудникам
+    // Применить матрицу ко всем текущим активным сотрудникам.
+    // Раньше это было N+1 по каждой строке матрицы (запрос пользователей + exists-проверка
+    // + insert на каждого) — на боевой матрице и удалённой БД (192.168.33.39, а не localhost)
+    // счёт шёл на сотни round-trip'ов и упирался в max_execution_time (30с). Теперь всё
+    // собирается за 2 запроса на чтение и пачку insert() вместо N отдельных create().
     public function applyToAll()
     {
-        $matrix = TrainingMatrix::active()->with('position')->get();
-        $created = 0;
+        $matrix = TrainingMatrix::active()->get();
+
+        if ($matrix->isEmpty()) {
+            return back()->with('info', 'Матрица обучения пуста — применять нечего.');
+        }
+
+        $positionIds = $matrix->pluck('position_id')->unique();
+        $documentIds = $matrix->pluck('document_id')->unique();
+
+        // admin включён: администратор может одновременно занимать штатную должность
+        // и должен получать обучение по матрице так же, как сотрудник или руководитель.
+        $usersByPosition = User::active()
+            ->whereIn('role', ['employee', 'manager', 'admin'])
+            ->whereIn('position_id', $positionIds)
+            ->get(['id', 'position_id'])
+            ->groupBy('position_id');
+
+        $userIds = $usersByPosition->flatten()->pluck('id')->unique();
+
+        // Уже существующие (не expired) назначения — набор "user_id:document_id" для O(1)-проверки в памяти
+        $existingPairs = TrainingAssignment::whereIn('user_id', $userIds)
+            ->whereIn('document_id', $documentIds)
+            ->whereNotIn('status', ['expired'])
+            ->get(['user_id', 'document_id'])
+            ->map(fn ($a) => "{$a->user_id}:{$a->document_id}")
+            ->flip();
+
+        $now  = now();
+        $rows = [];
 
         foreach ($matrix as $item) {
-            $users = User::active()
-                ->whereIn('role', ['employee', 'manager'])
-                ->where('position_id', $item->position_id)
-                ->get();
-
-            foreach ($users as $user) {
-                $exists = TrainingAssignment::where('user_id', $user->id)
-                    ->where('document_id', $item->document_id)
-                    ->whereNotIn('status', ['expired'])
-                    ->exists();
-
-                if (! $exists) {
-                    TrainingAssignment::create([
-                        'user_id' => $user->id,
-                        'document_id' => $item->document_id,
-                        'matrix_id' => $item->id,
-                        'training_type' => $item->training_type,
-                        'status' => 'pending',
-                        'due_date' => now()->addDays(30),
-                        'required_reading_minutes' => $item->required_reading_minutes,
-                    ]);
-                    $created++;
+            foreach ($usersByPosition->get($item->position_id, collect()) as $user) {
+                $key = "{$user->id}:{$item->document_id}";
+                if (isset($existingPairs[$key])) {
+                    continue;
                 }
+                $existingPairs[$key] = true; // защита от дублей, если на одну должность/документ несколько строк матрицы
+
+                $rows[] = [
+                    'user_id' => $user->id,
+                    'document_id' => $item->document_id,
+                    'matrix_id' => $item->id,
+                    'training_type' => $item->training_type,
+                    'status' => 'pending',
+                    'due_date' => $now->copy()->addDays(30),
+                    'required_reading_minutes' => $item->required_reading_minutes,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
             }
         }
+
+        foreach (array_chunk($rows, 500) as $chunk) {
+            TrainingAssignment::insert($chunk);
+        }
+
+        $created = count($rows);
 
         if ($created > 0) {
             AuditLog::log('create', 'TrainingAssignment', null, "Матрица применена ко всем сотрудникам: создано назначений {$created}");

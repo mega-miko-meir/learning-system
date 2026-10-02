@@ -53,6 +53,10 @@ const NAV_ITEMS = {
         { href: "admin.positions.index",   icon: ICONS.positions,   label: "Должности" },
         { href: "admin.reports.index",     icon: ICONS.reports,     label: "Отчёты" },
         { href: "admin.audit.index",       icon: ICONS.audit,       label: "Аудит" },
+        // Если у админа как у сотрудника есть своя должность — ему тоже назначается обучение
+        // по матрице (см. MatrixController/UserController::assignTrainingByPosition);
+        // сюда ведёт тот же маршрут, что уже используется для «Мои задания» у руководителя.
+        { href: "employee.assignments",    icon: ICONS.assignments,  label: "Моё обучение" },
     ],
     hr_admin: [
         { href: "hr.dashboard",            icon: ICONS.dashboard,   label: "Главная" },
