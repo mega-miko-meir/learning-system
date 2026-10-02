@@ -151,14 +151,14 @@ export default function DocumentsIndex({ documents }) {
                                             </span>
                                         ) : d.no_test_required ? (
                                             <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
-                                                Тест не требуется
+                                                Без теста
                                             </span>
                                         ) : (
                                             <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">
                                                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                 </svg>
-                                                Нет теста
+                                                Тест не прикреплён
                                             </span>
                                         )}
                                     </td>

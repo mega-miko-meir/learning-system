@@ -49,7 +49,7 @@ class AssignmentController extends Controller
                 'due_date_raw' => $a->due_date?->format('Y-m-d'),
                 'completed_at' => $a->completed_at?->format('d.m.Y'),
                 'reading_minutes' => $a->required_reading_minutes,
-                'has_test' => $a->document->test !== null,
+                'test_status' => $a->document->testStatus(),
             ]);
 
         $departments = Department::active()->orderBy('name')->get(['id', 'name']);

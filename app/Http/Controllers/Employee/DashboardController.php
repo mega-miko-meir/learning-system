@@ -31,7 +31,7 @@ class DashboardController extends Controller
                 'type'     => $a->training_type,
                 'status'   => $a->status,
                 'due_date' => $a->due_date?->format('d.m.Y'),
-                'has_test' => $a->document->test !== null,
+                'test_status' => $a->document->testStatus(),
             ]);
 
         return Inertia::render('Employee/Dashboard', compact('stats', 'upcoming'));

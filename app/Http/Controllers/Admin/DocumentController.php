@@ -287,7 +287,7 @@ class DocumentController extends Controller
 
         if (($data['completion_mode'] ?? null) === 'confirmation' && $document->test()->exists()) {
             return back()->withErrors([
-                'completion_mode' => 'У документа уже есть тест. Для режима «Отметка без теста» сначала удалите тест.',
+                'completion_mode' => 'У документа уже есть тест. Для режима «Без теста» сначала удалите тест.',
             ]);
         }
 

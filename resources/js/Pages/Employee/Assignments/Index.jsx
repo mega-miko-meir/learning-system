@@ -82,7 +82,7 @@ export default function AssignmentsIndex({ assignments }) {
                                         {item.completed_at && ` · завершено ${item.completed_at}`}
                                     </p>
                                 </div>
-                                <TestBadge hasTest={item.has_test} />
+                                <TestBadge testStatus={item.test_status} />
                                 <span className={`text-xs px-2.5 py-1 rounded-full border ${s.cls}`}>
                                     {s.label}
                                 </span>

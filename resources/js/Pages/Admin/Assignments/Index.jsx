@@ -465,7 +465,7 @@ export default function AssignmentsIndex({ assignments, departments, positions, 
                                         {TRAINING_TYPES.find((t) => t.value === a.type)?.label ?? a.type}
                                     </td>
                                     <td className="px-4 py-3">
-                                        <TestBadge hasTest={a.has_test} />
+                                        <TestBadge testStatus={a.test_status} />
                                     </td>
                                     <td className="px-4 py-3">
                                         <span className={`text-xs px-2 py-0.5 rounded-full ${

@@ -115,7 +115,12 @@ table.data tr:nth-child(even) td { background: #f8fafc; }
                 <td>v{{ $a->document->version }}</td>
                 <td>{{ ['primary'=>'Первичное','periodic'=>'Периодическое','unplanned'=>'Внеплановое','special'=>'Специальное'][$a->training_type] ?? $a->training_type }}</td>
                 <td>
-                    <span class="badge {{ $a->document->test ? 'badge-green' : 'badge-gray' }}">{{ $a->document->test ? 'С тестом' : 'Без теста' }}</span>
+                    @php $ts = $a->document->testStatus() @endphp
+                    @if($ts === 'no_test_required')
+                        <span class="badge badge-gray">Без теста</span>
+                    @elseif($ts === 'test_missing')
+                        <span class="badge badge-yellow">Тест не прикреплён</span>
+                    @endif
                 </td>
                 <td>
                     @php $sc = ['completed'=>'badge-green','failed'=>'badge-red','pending'=>'badge-yellow','in_progress'=>'badge-yellow'][$a->status] ?? 'badge-gray' @endphp

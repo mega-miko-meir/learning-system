@@ -44,6 +44,22 @@ class Document extends Model
         return $this->completion_mode === 'confirmation';
     }
 
+    // Три состояния по тесту, используются везде, где отображаются назначения/документы:
+    // has_test — обычный документ с привязанным тестом (стандартное поведение, без пометок);
+    // no_test_required — админ намеренно пометил «Без теста» (completion_mode=confirmation);
+    // test_missing — документ должен иметь тест (completion_mode=test), но админ ещё не привязал его —
+    // это ошибка конфигурации, а не осознанный выбор, сотрудника она не блокирует (см.
+    // AssignmentController::heartbeat), но администратору её стоит показывать отдельно.
+    // Требует предзагруженного отношения test (document.test), иначе будет лишний запрос.
+    public function testStatus(): string
+    {
+        if ($this->isConfirmationMode()) {
+            return 'no_test_required';
+        }
+
+        return $this->test ? 'has_test' : 'test_missing';
+    }
+
     public function trainingMatrix()
     {
         return $this->hasMany(TrainingMatrix::class);

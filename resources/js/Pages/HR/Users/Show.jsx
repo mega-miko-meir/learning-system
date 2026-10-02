@@ -308,7 +308,7 @@ export default function HRUserShow({ employee, assignments, documents }) {
                                                 {TRAINING_TYPES.find((t) => t.value === a.type)?.label ?? a.type}
                                             </td>
                                             <td className="py-2.5 pr-3">
-                                                <TestBadge hasTest={a.has_test} />
+                                                <TestBadge testStatus={a.test_status} />
                                             </td>
                                             <td className="py-2.5 pr-3">
                                                 <span className={`text-xs px-2 py-0.5 rounded-full ${s.cls}`}>{s.label}</span>

@@ -272,15 +272,15 @@ export default function DocumentForm({ document, positions = [] }) {
                                 onChange={(e) => setData("completion_mode", e.target.checked ? "confirmation" : "test")}
                                 className="w-4 h-4 accent-blue-600"
                             />
-                            <span className="text-sm font-medium text-gray-700">Тест не требуется</span>
+                            <span className="text-sm font-medium text-gray-700">Без теста</span>
                         </label>
                         {errors.completion_mode && (
                             <p className="mt-1 text-xs text-red-600">{errors.completion_mode}</p>
                         )}
                         {data.completion_mode === "confirmation" && (
                             <p className="mt-1.5 text-xs text-gray-400 ml-6">
-                                Сотруднику достаточно изучить документ и подтвердить ознакомление — статус «Обучен»
-                                ставится автоматически, тест для такого документа не создаётся.
+                                Сотрудник изучает документ как обычно и нажимает «Я всё прочитал(а)» — обучение
+                                сразу завершается статусом «Выполнено», тест для такого документа не нужен.
                             </p>
                         )}
                     </div>

@@ -90,7 +90,7 @@ export default function Dashboard({ stats, departments, recent }) {
                                         </p>
                                         <p className="text-gray-400 text-xs">{item.updated_at}</p>
                                     </div>
-                                    <TestBadge hasTest={item.has_test} />
+                                    <TestBadge testStatus={item.test_status} />
                                     <span
                                         className={`flex-shrink-0 text-xs px-2 py-0.5 rounded-full ${
                                             item.status === "completed"

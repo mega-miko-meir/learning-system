@@ -25,7 +25,7 @@ class AssignmentController extends Controller
                 'status'       => $a->status,
                 'due_date'     => $a->due_date?->format('d.m.Y'),
                 'completed_at' => $a->completed_at?->format('d.m.Y'),
-                'has_test'     => $a->document->test !== null,
+                'test_status'  => $a->document->testStatus(),
             ]);
 
         return Inertia::render('Employee/Assignments/Index', compact('assignments'));
@@ -37,10 +37,12 @@ class AssignmentController extends Controller
 
         $assignment->load('document.test');
 
-        // Обучение без теста (первичный инструктаж) — отдельный экран, остальной код ниже не затронут.
-        if (config('features.induction') && $assignment->document->isConfirmationMode()) {
-            return app(InductionController::class)->show($assignment);
-        }
+        // Документы «без теста» читаются точно так же, как и все остальные — единым экраном
+        // ниже с таймером, просмотрщиком PDF и кнопкой «Я всё прочитал(а)». Раньше такие
+        // документы (completion_mode=confirmation) уводились на отдельный экран-инструктаж
+        // с видео и открывали PDF в новой вкладке — убрано: завершение для них уже и так
+        // обрабатывается ниже тем же heartbeat() по отсутствию теста, видео-материалы на
+        // проде не использовались (0 загруженных document_materials).
 
         $requiredSeconds = ($assignment->required_reading_minutes ?? 10) * 60;
         $spentSeconds    = $assignment->time_spent_seconds ?? 0;

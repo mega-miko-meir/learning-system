@@ -34,7 +34,7 @@ class DashboardController extends Controller
                 'document'   => $a->document->display_name,
                 'status'     => $a->status,
                 'updated_at' => $a->updated_at->format('d.m.Y H:i'),
-                'has_test'   => $a->document->test !== null,
+                'test_status' => $a->document->testStatus(),
             ]);
 
         return Inertia::render('Manager/Dashboard', compact('stats', 'recentActivity'));

@@ -162,7 +162,7 @@ class UserController extends Controller
                 'status'       => $a->status,
                 'due_date'     => $a->due_date?->format('d.m.Y'),
                 'completed_at' => $a->completed_at?->format('d.m.Y'),
-                'has_test'     => $a->document->test !== null,
+                'test_status'  => $a->document->testStatus(),
             ]);
 
         return Inertia::render('HR/Users/Show', [

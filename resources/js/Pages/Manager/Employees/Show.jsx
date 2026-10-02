@@ -133,7 +133,7 @@ export default function EmployeeShow({ employee, assignments }) {
                                         <p className="text-sm font-medium text-gray-800 truncate">{a.document}</p>
                                         <div className="flex items-center gap-2 mt-1 flex-wrap">
                                             <span className={`text-xs px-2 py-0.5 rounded-full ${s.cls}`}>{s.label}</span>
-                                            <TestBadge hasTest={a.has_test} />
+                                            <TestBadge testStatus={a.test_status} />
                                             <span className="text-xs text-gray-400">{a.type}</span>
                                             {a.best_score != null && (
                                                 <span className="text-xs text-gray-500">

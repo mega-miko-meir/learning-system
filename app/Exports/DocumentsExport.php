@@ -21,9 +21,9 @@ class DocumentsExport implements FromQuery, WithEvents, WithHeadings, WithMappin
     // документов на сайте, только тут не иконка/бейдж, а текст + заливка ячейки под цвет.
     private const TEST_STATUS_HAS = 'Есть';
 
-    private const TEST_STATUS_NOT_REQUIRED = 'Тест не требуется';
+    private const TEST_STATUS_NOT_REQUIRED = 'Без теста';
 
-    private const TEST_STATUS_MISSING = 'Нет теста';
+    private const TEST_STATUS_MISSING = 'Тест не прикреплён';
 
     private const TEST_STATUS_COLORS = [
         self::TEST_STATUS_HAS => ['fill' => 'FFF0FDF4', 'font' => 'FF15803D'],          // зелёный

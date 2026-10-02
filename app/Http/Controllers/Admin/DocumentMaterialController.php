@@ -15,7 +15,7 @@ class DocumentMaterialController extends Controller
     public function store(Request $request, Document $document)
     {
         if (! $document->isConfirmationMode()) {
-            return back()->with('error', 'Материалы можно добавлять только к документам с режимом «Отметка без теста».');
+            return back()->with('error', 'Материалы можно добавлять только к документам с режимом «Без теста».');
         }
 
         $data = $request->validate([
