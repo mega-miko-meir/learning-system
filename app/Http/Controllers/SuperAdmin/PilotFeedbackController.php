@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\SuperAdmin;
 
+use App\Exports\PilotFeedbackExport;
 use App\Http\Controllers\Controller;
 use App\Models\PilotFeedbackResponse;
 use Inertia\Inertia;
+use Maatwebsite\Excel\Facades\Excel;
 
 class PilotFeedbackController extends Controller
 {
@@ -14,6 +16,7 @@ class PilotFeedbackController extends Controller
             ->paginate(20)
             ->through(fn ($r) => [
                 'id' => $r->id,
+                'ip_address' => $r->ip_address,
                 'nav_rating' => $r->nav_rating,
                 'nav_comment' => $r->nav_comment,
                 'had_issues' => $r->had_issues,
@@ -29,5 +32,12 @@ class PilotFeedbackController extends Controller
             ]);
 
         return Inertia::render('SuperAdmin/PilotFeedback/Index', compact('responses'));
+    }
+
+    public function export()
+    {
+        $filename = 'pilot_feedback_' . now()->format('Ymd_His') . '.xlsx';
+
+        return Excel::download(new PilotFeedbackExport, $filename);
     }
 }

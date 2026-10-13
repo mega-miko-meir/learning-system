@@ -31,6 +31,7 @@ function Row({ r }) {
                 className="w-full flex items-center gap-4 px-4 py-3 text-left"
             >
                 <span className="text-xs text-gray-400 w-32 shrink-0">{r.created_at}</span>
+                <span className="text-xs text-gray-400 w-28 shrink-0 font-mono">{r.ip_address || "—"}</span>
                 <span className="w-16 shrink-0"><Stars value={r.nav_rating} /></span>
                 <span className="w-20 shrink-0">
                     <Tag value={r.had_issues} tone={r.had_issues === "Да" ? "red" : "green"} />
@@ -94,9 +95,20 @@ export default function Index({ responses }) {
     return (
         <AppLayout title="Отзывы о пилоте">
             <div className="space-y-3 max-w-5xl">
-                <p className="text-sm text-gray-500 mb-2">
-                    Всего отзывов: {responses.total}. Ответы анонимны.
-                </p>
+                <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm text-gray-500">
+                        Всего отзывов: {responses.total}. Ответы анонимны.
+                    </p>
+                    <a
+                        href={route("superadmin.pilot-feedback.export")}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white transition-colors"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                        </svg>
+                        Экспорт в Excel
+                    </a>
+                </div>
 
                 {responses.data.length === 0 ? (
                     <div className="text-center text-gray-400 py-16 bg-white border border-gray-100 rounded-xl">

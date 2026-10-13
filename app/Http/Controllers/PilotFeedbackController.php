@@ -31,7 +31,7 @@ class PilotFeedbackController extends Controller
             'suggestions' => 'nullable|string|max:5000',
         ]);
 
-        PilotFeedbackResponse::create($data);
+        PilotFeedbackResponse::create($data + ['ip_address' => $request->ip()]);
 
         return redirect()->route('pilot-feedback.create')->with('pilot_feedback_submitted', true);
     }

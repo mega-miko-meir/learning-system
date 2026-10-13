@@ -84,6 +84,7 @@ Route::middleware(['auth', 'user.active'])->group(function () {
         Route::post('/users/{user}/toggle', [\App\Http\Controllers\SuperAdmin\UserController::class, 'toggleActive'])->name('users.toggle');
 
         // Отзывы о пилоте (анкета обратной связи) — видно только суперадмину
+        Route::get('/pilot-feedback/export', [\App\Http\Controllers\SuperAdmin\PilotFeedbackController::class, 'export'])->name('pilot-feedback.export');
         Route::get('/pilot-feedback', [\App\Http\Controllers\SuperAdmin\PilotFeedbackController::class, 'index'])->name('pilot-feedback.index');
     });
 

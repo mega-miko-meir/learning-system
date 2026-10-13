@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class PilotFeedbackResponse extends Model
 {
     protected $fillable = [
+        'ip_address',
         'nav_rating', 'nav_comment',
         'had_issues', 'issue_description',
         'timer_buttons_ok', 'timer_buttons_comment',
