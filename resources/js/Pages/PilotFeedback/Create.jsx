@@ -79,7 +79,7 @@ export default function Create() {
                         </div>
                         <h1 className="text-lg font-bold text-gray-900 mb-2">Спасибо за отзыв</h1>
                         <p className="text-sm text-gray-500">
-                            Мы изучим все ответы и учтём их перед тем, как открыть обучение для всех сотрудников.
+                            Мы изучим все ответы.
                         </p>
                     </div>
                 </div>
