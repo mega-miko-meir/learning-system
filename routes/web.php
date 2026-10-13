@@ -12,6 +12,11 @@ Route::middleware('guest')->group(function () {
     Route::post('/login', [AuthController::class, 'login'])->name('login.post');
 });
 
+// Анкета обратной связи по пилоту — доступна без авторизации по прямой ссылке,
+// заполняется анонимно (ответы без привязки к user_id).
+Route::get('/pilot-feedback', [\App\Http\Controllers\PilotFeedbackController::class, 'create'])->name('pilot-feedback.create');
+Route::post('/pilot-feedback', [\App\Http\Controllers\PilotFeedbackController::class, 'store'])->name('pilot-feedback.store');
+
 // ─── Авторизованные пользователи ──────────────────────────────
 Route::middleware(['auth', 'user.active'])->group(function () {
 
@@ -77,6 +82,9 @@ Route::middleware(['auth', 'user.active'])->group(function () {
         Route::post('/users', [\App\Http\Controllers\SuperAdmin\UserController::class, 'store'])->name('users.store');
         Route::post('/users/{user}/role', [\App\Http\Controllers\SuperAdmin\UserController::class, 'changeRole'])->name('users.role');
         Route::post('/users/{user}/toggle', [\App\Http\Controllers\SuperAdmin\UserController::class, 'toggleActive'])->name('users.toggle');
+
+        // Отзывы о пилоте (анкета обратной связи) — видно только суперадмину
+        Route::get('/pilot-feedback', [\App\Http\Controllers\SuperAdmin\PilotFeedbackController::class, 'index'])->name('pilot-feedback.index');
     });
 
     // ─── Основной администратор ───────────────────────────────
